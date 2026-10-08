@@ -1,0 +1,67 @@
+{
+  "$schema": "../../../../../megalodonte-jsonc-ui/schema/view.schema.json",
+  "version": 1,
+  "id": "cadastro",
+  "states": {
+    "nome": { "type": "string", "initial": "" },
+    "email": { "type": "string", "initial": "" },
+    // A máscara exibe o telefone; o estado guarda apenas os 11 dígitos.
+    "telefone": { "type": "string", "initial": "" },
+    "mensagem": { "type": "string", "initial": "" }
+  },
+  "view": {
+    "type": "Column",
+    "props": { "padding": 36, "alignment": "center", "fillHeight": true, "fillWidth": true },
+    "children": [
+      {
+        "type": "Column",
+        "props": { "maxWidth": 360, "spacing": 14 },
+        "children": [
+          { "type": "Text", "props": { "text": "Criar conta" }, "style": { "fontSize": 28, "bold": true } },
+          { "type": "Text", "props": { "text": "Preencha seus dados para começar" }, "style": { "fontSize": 15 } },
+          { "type": "Text", "props": { "text": "Nome" } },
+          {
+            "type": "Input",
+            "id": "nomeInput",
+            "bind": { "value": "nome" },
+            "props": { "placeholder": "Seu nome", "height": 44 },
+            "validation": { "required": true, "maxLength": 120, "label": "Nome" },
+            "events": { "onEnter": "onSubmit" }
+          },
+          { "type": "Text", "props": { "text": "Email" } },
+          {
+            "type": "Input",
+            "id": "emailInput",
+            "bind": { "value": "email" },
+            "props": { "placeholder": "voce@exemplo.com", "height": 44 },
+            "validation": { "required": true, "email": true, "label": "Email" },
+            "events": { "onEnter": "onSubmit" }
+          },
+          { "type": "Text", "props": { "text": "Telefone" } },
+          {
+            "type": "Input",
+            "id": "telefoneInput",
+            "bind": { "value": "telefone" },
+            "props": { "placeholder": "(11) 99999-9999", "height": 44 },
+            "format": { "kind": "mask", "pattern": "(##) #####-####", "store": "digits" },
+            "validation": { "required": true, "minLength": 11, "maxLength": 11, "label": "Telefone" },
+            "events": { "onEnter": "onSubmit" }
+          },
+          {
+            "type": "Button",
+            "id": "cadastrarButton",
+            "props": { "text": "Cadastrar", "height": 44, "fillWidth": true, "defaultButton": true },
+            "events": { "onClick": "onSubmit" }
+          },
+          {
+            "type": "Button",
+            "id": "voltarLoginButton",
+            "props": { "text": "Já possuo conta — Entrar", "height": 40, "fillWidth": true },
+            "events": { "onClick": "navigate_login" }
+          },
+          { "type": "Text", "id": "mensagemText", "bind": { "text": "mensagem" }, "props": { "wrapWidth": 340 }, "style": { "fontSize": 13 } }
+        ]
+      }
+    ]
+  }
+}

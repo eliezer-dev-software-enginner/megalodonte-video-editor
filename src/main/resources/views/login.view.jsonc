@@ -1,0 +1,56 @@
+{
+  "$schema": "../../../../../megalodonte-jsonc-ui/schema/view.schema.json",
+  "version": 1,
+  "id": "login",
+  // Cada instância da tela recebe seus próprios estados em memória.
+  "states": {
+    "email": { "type": "string", "initial": "" },
+    "senha": { "type": "string", "initial": "" },
+    "mensagem": { "type": "string", "initial": "" }
+  },
+  "view": {
+    "type": "Column",
+    "props": { "padding": 36, "alignment": "center", "fillHeight": true, "fillWidth": true },
+    "children": [
+      {
+        "type": "Column",
+        "props": { "maxWidth": 360, "spacing": 14 },
+        "children": [
+          { "type": "Text", "props": { "text": "Megalodonte Cliente" }, "style": { "fontSize": 28, "bold": true } },
+          { "type": "Text", "props": { "text": "Entre para continuar" }, "style": { "fontSize": 15 } },
+          { "type": "Text", "props": { "text": "Email" } },
+          {
+            "type": "Input",
+            "id": "emailInput",
+            "bind": { "value": "email" },
+            "props": { "placeholder": "voce@exemplo.com", "height": 44 },
+            "validation": { "required": true, "email": true, "label": "Email" },
+            "events": { "onEnter": "onSubmit" }
+          },
+          { "type": "Text", "props": { "text": "Senha" } },
+          {
+            "type": "PasswordInput",
+            "id": "senhaInput",
+            "bind": { "value": "senha" },
+            "props": { "placeholder": "Digite sua senha", "height": 44 },
+            "validation": { "required": true, "label": "Senha" },
+            "events": { "onEnter": "onSubmit" }
+          },
+          {
+            "type": "Button",
+            "id": "entrarButton",
+            "props": { "text": "Entrar", "height": 44, "fillWidth": true, "defaultButton": true },
+            "events": { "onClick": "onSubmit" }
+          },
+          {
+            "type": "Button",
+            "id": "criarContaButton",
+            "props": { "text": "Criar conta", "height": 40, "fillWidth": true },
+            "events": { "onClick": "navigate_cadastro" }
+          },
+          { "type": "Text", "id": "mensagemText", "bind": { "text": "mensagem" }, "props": { "wrapWidth": 340 }, "style": { "fontSize": 13 } }
+        ]
+      }
+    ]
+  }
+}

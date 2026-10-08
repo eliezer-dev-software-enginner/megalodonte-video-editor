@@ -1,0 +1,383 @@
+{
+  "$schema": "../../../../../megalodonte-jsonc-ui/schema/view.schema.json",
+  "version": 1,
+  "id": "editor",
+  "states": {
+    "roteiro": {
+      "type": "string",
+      "initial": ""
+    },
+    "timeline": {
+      "type": "string",
+      "initial": "[]"
+    },
+    "resumo": {
+      "type": "string",
+      "initial": "0 cenas · 0 segundos"
+    },
+    "imagem": {
+      "type": "string",
+      "initial": ""
+    },
+    "cenaTexto": {
+      "type": "string",
+      "initial": "Nenhuma cena selecionada"
+    },
+    "duracao": {
+      "type": "string",
+      "initial": "5"
+    },
+    "mensagem": {
+      "type": "string",
+      "initial": "Cole o roteiro à direita. Separe as cenas com uma linha em branco."
+    },
+    "selecionada": {
+      "type": "integer",
+      "initial": -1
+    },
+    "semSelecao": {
+      "type": "boolean",
+      "initial": true
+    }
+  },
+  "view": {
+    "type": "Column",
+    "props": {
+      "padding": 24,
+      "spacing": 20,
+      "fillWidth": true,
+      "fillHeight": true
+    },
+    "children": [
+      {
+        "type": "Row",
+        "props": {
+          "spacing": 16
+        },
+        "children": [
+          {
+            "type": "Text",
+            "style": {
+              "fontSize": 24
+            },
+            "props": {
+              "text": "MEGALODONTE  /  VIDEO EDITOR"
+            }
+          },
+          {
+            "type": "Button",
+            "props": {
+              "text": "Abrir projeto",
+              "height": 36
+            },
+            "events": {
+              "onClick": "openProject"
+            }
+          },
+          {
+            "type": "Button",
+            "props": {
+              "text": "Salvar projeto",
+              "height": 36
+            },
+            "events": {
+              "onClick": "saveProject"
+            }
+          },
+          {
+            "type": "Button",
+            "props": {
+              "text": "Importar imagens",
+              "height": 36
+            },
+            "events": {
+              "onClick": "importImages"
+            }
+          }
+        ]
+      },
+      {
+        "type": "Row",
+        "props": {
+          "spacing": 24,
+          "fillWidth": true,
+          "fillHeight": true
+        },
+        "children": [
+          {
+            "type": "Column",
+            "props": {
+              "spacing": 12,
+              "fillWidth": true,
+              "fillHeight": true
+            },
+            "children": [
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 15
+                },
+                "props": {
+                  "text": "PRÉVIA DA CENA"
+                }
+              },
+              {
+                "type": "ImagePreview",
+                "id": "preview",
+                "props": {
+                  "height": 240
+                },
+                "bind": {
+                  "source": "imagem"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 14
+                },
+                "props": {
+                  "wrapWidth": 620
+                },
+                "bind": {
+                  "text": "cenaTexto"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 18
+                },
+                "props": {
+                  "text": "TIMELINE · IMAGENS"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 14
+                },
+                "props": {},
+                "bind": {
+                  "text": "resumo"
+                }
+              },
+              {
+                "type": "ImageSequence",
+                "id": "timeline",
+                "props": {
+                  "height": 160
+                },
+                "bind": {
+                  "items": "timeline",
+                  "selected": "selecionada"
+                },
+                "events": {
+                  "onSelect": "selectScene"
+                }
+              },
+              {
+                "type": "Row",
+                "props": {
+                  "spacing": 8
+                },
+                "children": [
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Mover ←",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "moveLeft"
+                    },
+                    "bind": {
+                      "disabled": "semSelecao"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Mover →",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "moveRight"
+                    },
+                    "bind": {
+                      "disabled": "semSelecao"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Remover",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "removeScene"
+                    },
+                    "bind": {
+                      "disabled": "semSelecao"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Trocar imagem",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "replaceImage"
+                    },
+                    "bind": {
+                      "disabled": "semSelecao"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "Row",
+                "props": {
+                  "spacing": 12
+                },
+                "children": [
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {
+                      "text": "Duração (s)"
+                    }
+                  },
+                  {
+                    "type": "Input",
+                    "id": "durationInput",
+                    "props": {
+                      "width": 90,
+                      "height": 36
+                    },
+                    "bind": {
+                      "value": "duracao"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Aplicar",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "applyDuration"
+                    },
+                    "bind": {
+                      "disabled": "semSelecao"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "Column",
+            "props": {
+              "spacing": 14,
+              "width": 350,
+              "padding": 16,
+              "bgColor": "#edf2f8"
+            },
+            "children": [
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 22
+                },
+                "props": {
+                  "text": "ROTEIRO"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 14
+                },
+                "props": {
+                  "text": "Uma cena por parágrafo. Use uma linha em branco para separar as cenas.",
+                  "wrapWidth": 300
+                }
+              },
+              {
+                "type": "TextArea",
+                "id": "scriptInput",
+                "props": {
+                  "height": 350,
+                  "width": 320,
+                  "placeholder": "Cole seu roteiro aqui…"
+                },
+                "bind": {
+                  "value": "roteiro"
+                },
+                "validation": {
+                  "required": true,
+                  "label": "Roteiro",
+                  "maxLength": 100000
+                }
+              },
+              {
+                "type": "Button",
+                "props": {
+                  "text": "Criar cenas do roteiro",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "onSubmit"
+                },
+                "id": "createScenes"
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 16
+                },
+                "props": {
+                  "text": "INTEGRAÇÕES FUTURAS"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 14
+                },
+                "props": {
+                  "text": "IA para imagens · não configurada"
+                }
+              },
+              {
+                "type": "Text",
+                "style": {
+                  "fontSize": 14
+                },
+                "props": {
+                  "text": "Narração por API · não configurada"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Text",
+        "style": {
+          "fontSize": 14
+        },
+        "props": {
+          "wrapWidth": 1080
+        },
+        "bind": {
+          "text": "mensagem"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+.gradle/
+build/
+.idea/
+*.iml
+
+/.packaging/
+
+/dist/
+
+__pycache__/
