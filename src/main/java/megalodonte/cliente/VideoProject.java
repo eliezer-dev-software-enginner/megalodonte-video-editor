@@ -26,7 +26,7 @@ public final class VideoProject {
         return percent / 100;
     }
     public VideoProject snapshot() {
-        var copy = new VideoProject(); copy.script = script;
+        var copy = new VideoProject(); copy.script = script; copy.openaiApiKey = openaiApiKey;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
         for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; copy.clips.add(next); }
@@ -34,6 +34,7 @@ public final class VideoProject {
     }
     public static final String ASPECT_RATIO = "16:9";
     public String script = "";
+    public String openaiApiKey = "";
     public final List<Clip> clips = new ArrayList<>();
     public static VideoProject fromScript(String script) {
         var project = new VideoProject(); project.script = script;
@@ -60,6 +61,7 @@ public final class VideoProject {
             scene.addProperty("image", image); scenes.add(scene);
         }
         root.add("clips", scenes);
+        var metadata = new JsonObject(); metadata.addProperty("openaiApiKey", openaiApiKey); root.add("metadata", metadata);
         var audio = new JsonObject();
         audio.add("narration", audioJson(narration,absolute,assets));
         audio.add("music", audioJson(music,absolute,assets)); root.add("audio", audio);
@@ -76,6 +78,10 @@ public final class VideoProject {
             if (root.get("version").getAsInt() != 1) throw new IllegalArgumentException("Versão incompatível");
             if (root.has("aspectRatio") && !ASPECT_RATIO.equals(root.get("aspectRatio").getAsString())) throw new IllegalArgumentException("Somente vídeos horizontais 16:9 são suportados");
             var project = new VideoProject(); project.script = root.get("script").getAsString();
+            if (root.has("metadata")) {
+                var metadata = root.getAsJsonObject("metadata");
+                if (metadata.has("openaiApiKey") && !metadata.get("openaiApiKey").isJsonNull()) project.openaiApiKey = metadata.get("openaiApiKey").getAsString();
+            }
             for (var element : root.getAsJsonArray("clips")) {
                 var scene = element.getAsJsonObject(); var clip = new Clip(scene.get("text").getAsString());
                 clip.duration = scene.get("duration").getAsDouble();

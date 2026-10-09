@@ -15,7 +15,7 @@ jar = "build/install/megalodonte-video-editor/lib/megalodonte-video-editor-{vers
 version = "25.0.1"
 
 [runtime]
-modules = ["java.desktop", "javafx.controls", "javafx.media", "java.sql", "jdk.zipfs", "java.logging", "java.xml", "jdk.charsets"]
+modules = ["java.desktop", "java.net.http", "javafx.controls", "javafx.media", "java.sql", "jdk.zipfs", "java.logging", "java.xml", "jdk.charsets"]
 exclude_natives = ["jfxwebkit.dll"]
 
 [windows]

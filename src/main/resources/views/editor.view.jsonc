@@ -82,6 +82,18 @@
     "semMusica": {
       "type": "boolean",
       "initial": true
+    },
+    "gerandoImagens": {
+      "type": "boolean",
+      "initial": false
+    },
+    "iaStatus": {
+      "type": "string",
+      "initial": "OpenAI · lote de teste com até 3 cenas"
+    },
+    "openaiKey": {
+      "type": "string",
+      "initial": ""
     }
   },
   "view": {
@@ -159,8 +171,38 @@
                 }
               }
             ]
+          },
+          {
+            "type": "Row",
+            "props": {
+              "spacing": 12,
+              "fillWidth": true
+            },
+            "children": [
+              {
+                "type": "Text",
+                "props": {
+                  "text": "OpenAI API key · salva no projeto"
+                }
+              },
+              {
+                "type": "PasswordInput",
+                "id": "openaiKeyInput",
+                "props": {
+                  "height": 36,
+                  "placeholder": "Cole sua chave da OpenAI"
+                },
+                "bind": {
+                  "value": "openaiKey",
+                  "disabled": "gerandoImagens"
+                }
+              }
+            ]
           }
-        ]
+        ],
+        "bind": {
+          "disabled": "gerandoImagens"
+        }
       },
       {
         "type": "Row",
@@ -565,7 +607,10 @@
                   }
                 ]
               }
-            ]
+            ],
+            "bind": {
+              "disabled": "gerandoImagens"
+            }
           },
           {
             "type": "Scroll",
@@ -611,7 +656,8 @@
                       "placeholder": "Cole seu roteiro aqui…"
                     },
                     "bind": {
-                      "value": "roteiro"
+                      "value": "roteiro",
+                      "disabled": "gerandoImagens"
                     },
                     "validation": {
                       "required": true,
@@ -628,7 +674,10 @@
                     "events": {
                       "onClick": "onSubmit"
                     },
-                    "id": "createScenes"
+                    "id": "createScenes",
+                    "bind": {
+                      "disabled": "gerandoImagens"
+                    }
                   },
                   {
                     "type": "Text",
@@ -636,7 +685,7 @@
                       "fontSize": 16
                     },
                     "props": {
-                      "text": "INTEGRAÇÕES FUTURAS"
+                      "text": "IMAGENS COM OPENAI"
                     }
                   },
                   {
@@ -645,7 +694,46 @@
                       "fontSize": 14
                     },
                     "props": {
-                      "text": "IA para imagens · não configurada"
+                      "text": "Gera as cenas sem imagem. Salve o projeto antes do teste.",
+                      "wrapWidth": 300
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "generateImagesButton",
+                    "props": {
+                      "text": "Gerar imagens · até 3 cenas",
+                      "height": 36
+                    },
+                    "bind": {
+                      "disabled": "gerandoImagens"
+                    },
+                    "events": {
+                      "onClick": "generateImages"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "cancelImagesButton",
+                    "props": {
+                      "text": "Cancelar geração",
+                      "height": 36
+                    },
+                    "bind": {
+                      "visible": "gerandoImagens"
+                    },
+                    "events": {
+                      "onClick": "cancelImages"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "id": "imageGenerationStatus",
+                    "props": {
+                      "wrapWidth": 300
+                    },
+                    "bind": {
+                      "text": "iaStatus"
                     }
                   },
                   {

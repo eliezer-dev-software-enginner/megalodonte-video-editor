@@ -125,16 +125,18 @@ class EditorViewTest {
             });
             Platform.runLater(playbackCheck); playbackCheck.get(10,TimeUnit.SECONDS).get(10,TimeUnit.SECONDS);
             var restoreCheck=new FutureTask<Void>(() -> {
-                var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07;
+                var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07; stored.openaiApiKey="dummy-restored-key";
                 Path file=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"restaurado.json"); stored.save(file);
                 new LastProjectStore().remember(file);
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     app.render(); app.onMount(); var session=app.current();
                     assertEquals(stored.script,session.states().get("roteiro"));
+                    assertEquals(stored.openaiApiKey,session.states().get("openaiKey"));
                     assertEquals(7,Double.parseDouble(session.states().string("volumeMusica").get()),.0001);
                     assertTrue(session.states().string("resumo").get().startsWith("2 cenas"));
                     assertTrue(session.states().string("mensagem").get().contains("restaurado"));
-                    session.states().set("roteiro","Salvo no projeto restaurado"); session.invoke("saveProject");
+                    session.states().set("roteiro","Salvo no projeto restaurado"); session.states().set("openaiKey","dummy-updated-key"); session.invoke("saveProject");
+                    assertEquals("dummy-updated-key",VideoProject.load(file).openaiApiKey);
                     assertEquals("Salvo no projeto restaurado",VideoProject.load(file).script);
                 }
                 Files.delete(file);

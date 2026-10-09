@@ -13,8 +13,50 @@ public final class Editor extends ViewScript {
     private volatile boolean disposed;
     private VideoExporter exporter;
     private Thread exportThread;
+    private ImageGenerationJob imageJob;
+    private Thread imageThread;
+    public void generateImages() {
+        if(imageJob!=null) return;
+        OpenAiImageClient client;
+        try { ImageGenerationJob.pending(project); client=OpenAiImageClient.fromSessionKey(text("openaiKey")); }
+        catch(Exception e) { message(e.getMessage()); return; }
+        if(projectFile==null) { message("Salve o projeto antes de gerar imagens para guardar os PNGs junto aos assets."); return; }
+        pausePlayback(); project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip();
+        var snapshot=project.snapshot(); var targetProject=project;
+        var job=new ImageGenerationJob(client); imageJob=job;set("gerandoImagens",true);set("iaStatus","Preparando imagens…");
+        Path assets=projectFile.getParent().resolve(projectFile.getFileName()+".assets").resolve("generated");
+        imageThread=Thread.ofPlatform().daemon(true).name("openai-images").start(()-> {
+            String outcome;
+            try {
+                job.run(snapshot,assets,(index,file)-> {
+                    var applied=new java.util.concurrent.CompletableFuture<Void>();
+                    javafx.application.Platform.runLater(()-> {
+                        if(disposed || imageJob!=job || job.cancelled() || project!=targetProject) { applied.completeExceptionally(new java.util.concurrent.CancellationException());return; }
+                        project.clips.get(index).image=file.toString(); refresh();
+                        try { project.save(projectFile);applied.complete(null); }
+                        catch(Exception e) { applied.completeExceptionally(e); }
+                    });
+                    try { applied.get(); }
+                    catch(InterruptedException e) { Thread.currentThread().interrupt();throw new java.util.concurrent.CancellationException(); }
+                    catch(java.util.concurrent.ExecutionException e) { throw new IllegalStateException("Imagem anexada, mas não foi possível atualizar o manifesto.",e.getCause()); }
+                },progress->javafx.application.Platform.runLater(()-> { if(!disposed && imageJob==job) set("iaStatus",progress); }));
+                outcome="Imagens geradas e anexadas às cenas em ordem.";
+            } catch(java.util.concurrent.CancellationException | InterruptedException e) { outcome="Geração cancelada. Imagens já anexadas foram mantidas."; }
+            catch(Exception e) { outcome="A geração parou: "+e.getMessage()+". As imagens já anexadas foram mantidas."; }
+            final String result=outcome;
+            javafx.application.Platform.runLater(()-> {
+                if(!disposed && imageJob==job) { imageJob=null;imageThread=null;set("gerandoImagens",false);set("iaStatus",result);message(result); }
+            });
+        });
+    }
+    public void cancelImages() { if(imageJob!=null) { imageJob.cancel();if(imageThread!=null) imageThread.interrupt();set("iaStatus","Cancelando geração…"); } }
+    private boolean generationBusy() {
+        if(imageJob==null) return false;
+        message("Aguarde ou cancele a geração de imagens antes de alterar o projeto.");return true;
+    }
+
     @Override public void onDestroy() {
-        disposed = true; if (playback != null) playback.stop(); playing = false;
+        disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt(); if (playback != null) playback.stop(); playing = false;
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
     }
     private void audioError(String error) { if (!disposed) message(error); }
@@ -24,8 +66,8 @@ public final class Editor extends ViewScript {
         set("volumeNarracao",Double.toString(project.narration.volume*100)); set("volumeMusica",Double.toString(project.music.volume*100));
         set("semNarracao",project.narration.file.isBlank()); set("semMusica",project.music.file.isBlank());
     }
-    public void attachNarration() { attachAudio(project.narration); }
-    public void attachMusic() { attachAudio(project.music); }
+    public void attachNarration() { if(generationBusy()) return; attachAudio(project.narration); }
+    public void attachMusic() { if(generationBusy()) return; attachAudio(project.music); }
     private void attachAudio(VideoProject.AudioTrack track) {
         if (!readVolumes()) return;
         var kind=track==project.narration ? FileDialogs.Kind.NARRATION : FileDialogs.Kind.MUSIC;
@@ -33,8 +75,8 @@ public final class Editor extends ViewScript {
         java.io.File file=files.getFirst().toFile();
         pausePlayback(); track.file = file.getAbsolutePath(); refreshAudio(); message("Áudio anexado. Ajuste os volumes e clique em Aplicar volumes."); audio.load(project,this::audioError);
     }
-    public void removeNarration() { pausePlayback(); project.narration.file=""; refreshAudio(); audio.load(project,this::audioError); }
-    public void removeMusic() { pausePlayback(); project.music.file=""; refreshAudio(); audio.load(project,this::audioError); }
+    public void removeNarration() { if(generationBusy()) return; pausePlayback(); project.narration.file=""; refreshAudio(); audio.load(project,this::audioError); }
+    public void removeMusic() { if(generationBusy()) return; pausePlayback(); project.music.file=""; refreshAudio(); audio.load(project,this::audioError); }
     private boolean readVolumes() {
         try {
             double narration = VideoProject.volumeFromPercent(text("volumeNarracao"));
@@ -43,7 +85,7 @@ public final class Editor extends ViewScript {
         } catch (IllegalArgumentException e) { message("Informe volumes entre 0 e 100%."); return false; }
     }
     public void applyVolumes() { if (readVolumes()) message("Volumes aplicados à prévia e à exportação."); }
-    public void exportVideo() {
+    public void exportVideo() { if(generationBusy()) return;
         if (exporter != null || !readVolumes()) return;
         pausePlayback();
         var files=chooseFiles(FileDialogs.Kind.VIDEO); if(files.isEmpty()) return;
@@ -105,17 +147,18 @@ public final class Editor extends ViewScript {
     @Override public void onMount() {
         refreshAudio(); refresh();
         try {
-            var last=lastProject.lastSaved();
+            String initial=System.getProperty("megalodonte.editor.initialProject","");
+            var last=initial.isBlank() ? lastProject.lastSaved() : Optional.of(Path.of(initial));
             if (last.isPresent()) {
                 Path file=last.get();
                 var loaded=VideoProject.load(file); applyProject(loaded,file);
-                message("Último projeto salvo restaurado: " + file + missingAssetsMessage());
+                message((initial.isBlank() ? "Último projeto salvo restaurado: " : "Projeto aberto: ") + file + missingAssetsMessage());
             }
         } catch (Exception e) { message("Não foi possível restaurar o último projeto salvo. O editor abriu vazio: " + e.getMessage()); }
     }
-    @Override public void onSubmit() {
+    @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
-        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro"));
+        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.openaiApiKey=text("openaiKey").strip();
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
         project.music.file=previous.music.file; project.music.volume=previous.music.volume; set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
         message("Cenas criadas localmente, uma por parágrafo. Importe as imagens na ordem desejada.");
@@ -137,7 +180,7 @@ public final class Editor extends ViewScript {
         set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
         set("duracao", clip == null ? "5" : Double.toString(clip.duration));
     }
-    public void applyDuration() {
+    public void applyDuration() { if(generationBusy()) return;
         var clip = selected(); if (clip == null) return;
         try { double value = Double.parseDouble(text("duracao").replace(',', '.'));
             if (!Double.isFinite(value) || value < .1 || value > 3600) throw new NumberFormatException();
@@ -146,12 +189,12 @@ public final class Editor extends ViewScript {
     }
     public void moveLeft() { move(-1); }
     public void moveRight() { move(1); }
-    private void move(int delta) { int i = index(), target = i + delta;
+    private void move(int delta) { if(generationBusy()) return; int i = index(), target = i + delta;
         if (selected() == null || target < 0 || target >= project.clips.size()) return;
         timelineChanged(); Collections.swap(project.clips, i, target); set("selecionada", target); refresh();
     }
-    public void removeScene() { if (selected() == null) return; timelineChanged(); int i = index(); project.clips.remove(i); set("selecionada", Math.min(i, project.clips.size() - 1)); refresh(); }
-    public void importImages() {
+    public void removeScene() { if(generationBusy()) return; if (selected() == null) return; timelineChanged(); int i = index(); project.clips.remove(i); set("selecionada", Math.min(i, project.clips.size() - 1)); refresh(); }
+    public void importImages() { if(generationBusy()) return;
         var files=chooseFiles(FileDialogs.Kind.IMAGES); if(files.isEmpty()) return;
         try {
             var paths=files.stream().distinct().sorted(Comparator.comparing(p -> p.getFileName().toString(),String.CASE_INSENSITIVE_ORDER)).toList();
@@ -165,7 +208,7 @@ public final class Editor extends ViewScript {
             if (selected() == null) set("selecionada", 0); refresh(); message(paths.size() + " imagens anexadas em ordem de nome.");
         } catch (RuntimeException e) { message(e.getMessage()); }
     }
-    public void replaceImage() {
+    public void replaceImage() { if(generationBusy()) return;
         var clip=selected(); if(clip==null) return;
         var files=chooseFiles(FileDialogs.Kind.IMAGE); if(files.isEmpty()) return;
         Path file=files.getFirst();
@@ -174,7 +217,7 @@ public final class Editor extends ViewScript {
             timelineChanged(); clip.image=file.toString(); refresh(); message("Imagem substituída.");
         } catch(RuntimeException e) { message("Não foi possível trocar a imagem: " + e.getMessage()); }
     }
-    public void saveProject() {
+    public void saveProject() { if(generationBusy()) return;
         if(!readVolumes()) return;
         Path target=projectFile;
         if(target==null) {
@@ -186,12 +229,12 @@ public final class Editor extends ViewScript {
         }
         try {
             FileSelections.protectAssets(project,target,projectFile,false);
-            project.script=text("roteiro"); project.save(target); projectFile=target;
+            project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip(); project.save(target); projectFile=target;
         } catch(Exception e) { message("Não foi possível salvar: " + e.getMessage()); return; }
         try { lastProject.remember(projectFile); message("Projeto salvo: " + projectFile); }
         catch(Exception e) { message("Projeto salvo: " + projectFile + ". Não foi possível guardar o caminho para a próxima inicialização: " + e.getMessage()); }
     }
-    public void openProject() {
+    public void openProject() { if(generationBusy()) return;
         var files=chooseFiles(FileDialogs.Kind.PROJECT_OPEN); if(files.isEmpty()) return;
         Path file=files.getFirst();
         try { var loaded = VideoProject.load(file);
@@ -201,7 +244,7 @@ public final class Editor extends ViewScript {
     }
     private void applyProject(VideoProject loaded,Path file) {
         timelineChanged(); project=loaded; projectFile=file.toAbsolutePath().normalize();
-        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script);
+        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",project.openaiApiKey);
         set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }
     private String missingAssetsMessage() {

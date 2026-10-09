@@ -24,7 +24,7 @@ O formato é fixo: **YouTube horizontal 16:9**. A prévia mantém um quadro 16:9
 
 **▶ Play** reproduz a sequência respeitando a duração de cada cena. O mesmo botão pausa; **↺ Início** interrompe e retorna ao começo. O contador mostra o tempo atual e o total. Ao terminar, Play reinicia a sequência. Selecionar uma cena posiciona a reprodução no início dela.
 
-A timeline tem miniaturas, intervalos cumulativos e rolagem horizontal. A roda do mouse e o gesto horizontal do trackpad rolam a timeline; a barra pode ser arrastada. Os painéis central e direito usam o scroll v2 do Megalodonte. A janela pode ser redimensionada ou maximizada, e os painéis rolam quando o conteúdo ultrapassa a área disponível. Imagens ausentes mostram uma prévia vazia e podem ser substituídas. A prévia e a exportação usam imagens, narração e música locais. Não há chamadas a APIs de geração de imagens ou narração. O roteiro editado não altera cenas existentes automaticamente; recriar as cenas pede confirmação.
+A timeline tem miniaturas, intervalos cumulativos e rolagem horizontal. A roda do mouse e o gesto horizontal do trackpad rolam a timeline; a barra pode ser arrastada. Os painéis central e direito usam o scroll v2 do Megalodonte. A janela pode ser redimensionada ou maximizada, e os painéis rolam quando o conteúdo ultrapassa a área disponível. Imagens ausentes mostram uma prévia vazia e podem ser substituídas. A prévia e a exportação usam imagens, narração e música locais. A geração de imagens já pode usar a OpenAI. A narração continua sendo anexada como arquivo local. O roteiro editado não altera cenas existentes automaticamente; recriar as cenas pede confirmação.
 
 ## Restaurar o último projeto salvo
 
@@ -58,3 +58,49 @@ bash gradlew installDist
 Os testes do editor verificam separação do roteiro, portabilidade das imagens e áudios, volumes, leitura de projetos inválidos, exportação real e ações da UI, gerando capturas em `build/preview/`. Os testes JavaFX exigem ambiente gráfico. Os testes de exportação usam FFmpeg/FFprobe e são ignorados quando FFmpeg não está instalado. A distribuição fica em `build/install/megalodonte-video-editor` e requer Java 25.
 
 Detalhes e decisões: [arquitetura](docs/arquitetura.md).
+
+
+## Gerar imagens com OpenAI — teste inicial
+
+1. Cole um roteiro curto, separando as cenas por uma linha em branco, e clique em **Criar cenas do roteiro**.
+2. Salve o projeto para definir onde os assets serão gravados.
+3. Informe a chave no campo oculto **OpenAI API key · salva no projeto**, ou inicie o editor com `OPENAI_API_KEY` configurada.
+4. Clique em **Gerar imagens · até 3 cenas**. Os resultados vão diretamente para as cenas sem imagem, em ordem, e o manifesto é atualizado após cada resultado.
+
+O teste inicial permite até três cenas sem imagem por lote. Cenas que já têm imagem não são cobradas novamente por esse botão. O roteiro é separado localmente; o texto de cada cena e um trecho de contexto são enviados ao endpoint de imagens. Os padrões são `gpt-image-2`, `1536x864` (16:9), qualidade `low` e PNG. São configuráveis via `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE` e `OPENAI_IMAGE_QUALITY`; as combinações precisam ser suportadas pelo modelo escolhido. Contrato verificado na [API oficial de geração de imagens](https://developers.openai.com/api/reference/resources/images/methods/generate).
+
+A API usa a chave informada e pode gerar cobrança na conta correspondente. A chave informada no campo oculto do topo é salva em `metadata.openaiApiKey` no manifesto ao salvar o projeto ou anexar uma imagem gerada, e restaurada ao abrir o projeto. O manifesto contém a chave em texto simples: compartilhar o projeto também compartilha essa credencial. A variável de ambiente continua como alternativa quando o campo está vazio. Não há retentativas automáticas: se a API falhar, as cenas já prontas permanecem anexadas; clicar novamente solicita somente as pendentes. Cancelar interrompe o lote e conserva as imagens anexadas. Uma solicitação já enviada pode ter sido processada pela API antes do cancelamento.
+
+A geração ocorre em segundo plano. Alterações estruturais ficam bloqueadas até o término ou cancelamento. PNGs recebidos em base64 são validados e gravados em `<projeto>.assets/generated/`; o salvamento normal incorpora os arquivos ao manifesto portátil.
+
+### Teste real, executado explicitamente
+
+Exemplos de roteiro: `examples/roteiro-curto.txt` (duas cenas) e `examples/roteiro-uma-cena.txt`.
+
+Com uma chave no ambiente:
+
+```bash
+bash gradlew imageIntegrationSmoke
+```
+
+Essa tarefa chama a API real; não faz parte dos testes comuns. Para um destino persistente novo:
+
+```bash
+bash gradlew imageIntegrationSmoke -PscriptFile=examples/roteiro-uma-cena.txt -PprojectOutput=projects/meu-teste/projeto.mvideo.json
+```
+
+O projeto real de duas cenas validado em 9 de outubro de 2026 foi preservado em `projects/openai-real-20261009/projeto.mvideo.json`. Abra esse manifesto pelo botão **Abrir projeto** ou execute:
+
+```bash
+bash gradlew run -PinitialProject=projects/openai-real-20261009/projeto.mvideo.json
+```
+
+`initialProject` abre o arquivo uma vez, sem trocar a preferência do último projeto salvo até que você salve. A pasta `projects/` é ignorada pelo Git para preservar os artefatos locais sem versionar imagens grandes.
+
+Para renderizar e verificar um projeto gerado, sem novas chamadas à API:
+
+```bash
+bash gradlew test --tests '*OpenAiGeneratedProjectUiTest' -PliveProject=projects/openai-real-20261009/projeto.mvideo.json
+```
+
+Os testes normais usam um servidor HTTP local com PNGs de teste e não consomem a API. Capturas da integração real ficam em `build/preview/openai-live-scene-1.png` e `openai-live-scene-2.png`.

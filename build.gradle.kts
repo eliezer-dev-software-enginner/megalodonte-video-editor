@@ -21,3 +21,20 @@ application {
 }
 tasks.test { useJUnitPlatform(); jvmArgs("--enable-native-access=ALL-UNNAMED") }
 tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+
+// Explicit opt-in: this task calls the real, billable OpenAI Images API.
+tasks.register<JavaExec>("imageIntegrationSmoke") {
+    group = "verification"
+    description = "Gera imagens reais para um roteiro curto e salva um projeto do editor"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("megalodonte.cliente.ImageIntegrationSmoke")
+    args(providers.gradleProperty("scriptFile").orElse("examples/roteiro-curto.txt").get(),
+         providers.gradleProperty("projectOutput").orElse("build/integration/openai-curto/projeto.mvideo.json").get())
+}
+
+tasks.test {
+    systemProperty("megalodonte.live.project", providers.gradleProperty("liveProject").orElse("").get())
+}
+tasks.named<JavaExec>("run") {
+    providers.gradleProperty("initialProject").orNull?.let { systemProperty("megalodonte.editor.initialProject", file(it).absolutePath) }
+}
