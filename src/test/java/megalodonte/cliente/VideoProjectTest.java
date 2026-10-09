@@ -13,8 +13,15 @@ class VideoProjectTest {
     @Test void savedProjectCarriesAssetsAndSurvivesRemovalOfOriginal() throws Exception {
         var image = directory.resolve("original.png"); Files.write(image, new byte[]{1,2,3});
         var project = VideoProject.fromScript("Cena um\n\nCena dois"); project.clips.getFirst().image = image.toString(); project.clips.getFirst().duration = 7.5;
-        var file = directory.resolve("video.mvideo.json"); project.save(file); Files.delete(image);
+        var narration=directory.resolve("voice.wav"); Files.write(narration,new byte[]{4,5,6});
+        var music=directory.resolve("music.mp3"); Files.write(music,new byte[]{7,8,9});
+        project.narration.file=narration.toString(); project.music.file=music.toString(); project.music.volume=.12;
+        var file = directory.resolve("video.mvideo.json"); project.save(file); Files.delete(image); Files.delete(narration); Files.delete(music);
+        assertTrue(Files.readString(file).contains("16:9"));
         var loaded = VideoProject.load(file); assertEquals(2, loaded.clips.size()); assertEquals(12.5, loaded.duration());
+        assertEquals(.12,loaded.music.volume); assertEquals(1,loaded.narration.volume);
+        assertArrayEquals(new byte[]{4,5,6},Files.readAllBytes(Path.of(loaded.narration.file)));
+        assertArrayEquals(new byte[]{7,8,9},Files.readAllBytes(Path.of(loaded.music.file)));
         assertArrayEquals(new byte[]{1,2,3}, Files.readAllBytes(Path.of(loaded.clips.getFirst().image)));
         loaded.save(file); assertEquals(2, VideoProject.load(file).clips.size());
     }
@@ -24,5 +31,15 @@ class VideoProjectTest {
         assertThrows(java.io.IOException.class, () -> VideoProject.load(file));
         Files.writeString(file, "{\"version\":1,\"script\":\"\",\"clips\":[{\"text\":\"a\",\"image\":\"\",\"duration\":-1}]}");
         assertThrows(java.io.IOException.class, () -> VideoProject.load(file));
+        Files.writeString(file, "{\"version\":1,\"aspectRatio\":\"9:16\",\"script\":\"\",\"clips\":[]}");
+        assertThrows(java.io.IOException.class, () -> VideoProject.load(file));
     }
+    @Test void defaultsAndPercentVolumesAreValidated() throws Exception {
+        var project=new VideoProject(); assertEquals(.15,project.music.volume); assertEquals(1,project.narration.volume);
+        assertEquals(.125,VideoProject.volumeFromPercent("12,5")); assertEquals(0,VideoProject.volumeFromPercent("0"));
+        for(String value:new String[]{"NaN","Infinity","-1","101","abc"}) assertThrows(IllegalArgumentException.class,()->VideoProject.volumeFromPercent(value));
+        var file=directory.resolve("legacy.json"); Files.writeString(file,"{\"version\":1,\"script\":\"\",\"clips\":[]}");
+        var legacy=VideoProject.load(file); assertEquals(.15,legacy.music.volume); assertEquals("",legacy.narration.file);
+    }
+
 }

@@ -6,7 +6,7 @@ group = "megalodonte"
 version = "0.1.0"
 repositories { mavenLocal(); mavenCentral() }
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }
-javafx { version = "25.0.1"; modules("javafx.controls", "javafx.graphics") }
+javafx { version = "25.0.1"; modules("javafx.controls", "javafx.graphics", "javafx.media") }
 dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("megalodonte:megalodonte-script-app:0.1.0")

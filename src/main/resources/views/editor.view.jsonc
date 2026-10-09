@@ -38,6 +38,50 @@
     "semSelecao": {
       "type": "boolean",
       "initial": true
+    },
+    "playLabel": {
+      "type": "string",
+      "initial": "▶ Play"
+    },
+    "tempo": {
+      "type": "string",
+      "initial": "0.0s / 0.0s"
+    },
+    "semCenas": {
+      "type": "boolean",
+      "initial": true
+    },
+    "narracaoNome": {
+      "type": "string",
+      "initial": "Nenhuma narração anexada"
+    },
+    "musicaNome": {
+      "type": "string",
+      "initial": "Nenhuma música anexada"
+    },
+    "volumeNarracao": {
+      "type": "string",
+      "initial": "100"
+    },
+    "volumeMusica": {
+      "type": "string",
+      "initial": "15"
+    },
+    "exportStatus": {
+      "type": "string",
+      "initial": ""
+    },
+    "exportando": {
+      "type": "boolean",
+      "initial": false
+    },
+    "semNarracao": {
+      "type": "boolean",
+      "initial": true
+    },
+    "semMusica": {
+      "type": "boolean",
+      "initial": true
     }
   },
   "view": {
@@ -50,9 +94,9 @@
     },
     "children": [
       {
-        "type": "Row",
+        "type": "Column",
         "props": {
-          "spacing": 16
+          "spacing": 8
         },
         "children": [
           {
@@ -65,34 +109,56 @@
             }
           },
           {
-            "type": "Button",
+            "type": "Row",
             "props": {
-              "text": "Abrir projeto",
-              "height": 36
+              "spacing": 12
             },
-            "events": {
-              "onClick": "openProject"
-            }
-          },
-          {
-            "type": "Button",
-            "props": {
-              "text": "Salvar projeto",
-              "height": 36
-            },
-            "events": {
-              "onClick": "saveProject"
-            }
-          },
-          {
-            "type": "Button",
-            "props": {
-              "text": "Importar imagens",
-              "height": 36
-            },
-            "events": {
-              "onClick": "importImages"
-            }
+            "children": [
+              {
+                "type": "Button",
+                "props": {
+                  "text": "Abrir projeto",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "openProject"
+                }
+              },
+              {
+                "type": "Button",
+                "props": {
+                  "text": "Salvar projeto",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "saveProject"
+                }
+              },
+              {
+                "type": "Button",
+                "props": {
+                  "text": "Importar imagens",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "importImages"
+                }
+              },
+              {
+                "type": "Button",
+                "props": {
+                  "text": "Exportar vídeo",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "exportVideo"
+                },
+                "id": "exportButton",
+                "bind": {
+                  "disabled": "exportando"
+                }
+              }
+            ]
           }
         ]
       },
@@ -105,139 +171,15 @@
         },
         "children": [
           {
-            "type": "Column",
+            "type": "Scroll",
+            "id": "editorScroll",
             "props": {
-              "spacing": 12,
               "fillWidth": true,
               "fillHeight": true
             },
             "children": [
               {
-                "type": "Text",
-                "style": {
-                  "fontSize": 15
-                },
-                "props": {
-                  "text": "PRÉVIA DA CENA"
-                }
-              },
-              {
-                "type": "ImagePreview",
-                "id": "preview",
-                "props": {
-                  "height": 240
-                },
-                "bind": {
-                  "source": "imagem"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 14
-                },
-                "props": {
-                  "wrapWidth": 620
-                },
-                "bind": {
-                  "text": "cenaTexto"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 18
-                },
-                "props": {
-                  "text": "TIMELINE · IMAGENS"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 14
-                },
-                "props": {},
-                "bind": {
-                  "text": "resumo"
-                }
-              },
-              {
-                "type": "ImageSequence",
-                "id": "timeline",
-                "props": {
-                  "height": 160
-                },
-                "bind": {
-                  "items": "timeline",
-                  "selected": "selecionada"
-                },
-                "events": {
-                  "onSelect": "selectScene"
-                }
-              },
-              {
-                "type": "Row",
-                "props": {
-                  "spacing": 8
-                },
-                "children": [
-                  {
-                    "type": "Button",
-                    "props": {
-                      "text": "Mover ←",
-                      "height": 36
-                    },
-                    "events": {
-                      "onClick": "moveLeft"
-                    },
-                    "bind": {
-                      "disabled": "semSelecao"
-                    }
-                  },
-                  {
-                    "type": "Button",
-                    "props": {
-                      "text": "Mover →",
-                      "height": 36
-                    },
-                    "events": {
-                      "onClick": "moveRight"
-                    },
-                    "bind": {
-                      "disabled": "semSelecao"
-                    }
-                  },
-                  {
-                    "type": "Button",
-                    "props": {
-                      "text": "Remover",
-                      "height": 36
-                    },
-                    "events": {
-                      "onClick": "removeScene"
-                    },
-                    "bind": {
-                      "disabled": "semSelecao"
-                    }
-                  },
-                  {
-                    "type": "Button",
-                    "props": {
-                      "text": "Trocar imagem",
-                      "height": 36
-                    },
-                    "events": {
-                      "onClick": "replaceImage"
-                    },
-                    "bind": {
-                      "disabled": "semSelecao"
-                    }
-                  }
-                ]
-              },
-              {
-                "type": "Row",
+                "type": "Column",
                 "props": {
                   "spacing": 12
                 },
@@ -245,34 +187,380 @@
                   {
                     "type": "Text",
                     "style": {
-                      "fontSize": 14
+                      "fontSize": 15
                     },
                     "props": {
-                      "text": "Duração (s)"
+                      "text": "PRÉVIA · YOUTUBE HORIZONTAL · 16:9"
                     }
                   },
                   {
-                    "type": "Input",
-                    "id": "durationInput",
+                    "type": "ImagePreview",
+                    "id": "preview",
                     "props": {
-                      "width": 90,
-                      "height": 36
+                      "height": 320
                     },
                     "bind": {
-                      "value": "duracao"
+                      "source": "imagem"
+                    }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 14
+                    },
+                    "children": [
+                      {
+                        "type": "Button",
+                        "id": "playButton",
+                        "props": {
+                          "height": 36
+                        },
+                        "bind": {
+                          "text": "playLabel",
+                          "disabled": "semCenas"
+                        },
+                        "events": {
+                          "onClick": "togglePlay"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "rewindButton",
+                        "props": {
+                          "text": "↺ Início",
+                          "height": 36
+                        },
+                        "bind": {
+                          "disabled": "semCenas"
+                        },
+                        "events": {
+                          "onClick": "rewind"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "bind": {
+                          "text": "tempo"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {
+                      "wrapWidth": 480
+                    },
+                    "bind": {
+                      "text": "cenaTexto"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 18
+                    },
+                    "props": {
+                      "text": "TIMELINE · IMAGENS"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {},
+                    "bind": {
+                      "text": "resumo"
+                    }
+                  },
+                  {
+                    "type": "ImageSequence",
+                    "id": "timeline",
+                    "props": {
+                      "height": 160
+                    },
+                    "bind": {
+                      "items": "timeline",
+                      "selected": "selecionada"
+                    },
+                    "events": {
+                      "onSelect": "selectScene"
+                    }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 8
+                    },
+                    "children": [
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Mover ←",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "moveLeft"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Mover →",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "moveRight"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Remover",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "removeScene"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Trocar imagem",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "replaceImage"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 12
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 14
+                        },
+                        "props": {
+                          "text": "Duração (s)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "durationInput",
+                        "props": {
+                          "width": 90,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "duracao"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Aplicar",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "applyDuration"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450,
+                      "text": "ÁUDIO · NARRAÇÃO E MÚSICA"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450
+                    },
+                    "bind": {
+                      "text": "narracaoNome"
+                    }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 12
+                    },
+                    "children": [
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Anexar narração",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "attachNarration"
+                        },
+                        "id": "attachNarrationButton"
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Remover narração",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "removeNarration"
+                        },
+                        "bind": {
+                          "disabled": "semNarracao"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450
+                    },
+                    "bind": {
+                      "text": "musicaNome"
+                    }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 12
+                    },
+                    "children": [
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Adicionar música de fundo",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "attachMusic"
+                        },
+                        "id": "attachMusicButton"
+                      },
+                      {
+                        "type": "Button",
+                        "props": {
+                          "text": "Remover música",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "removeMusic"
+                        },
+                        "bind": {
+                          "disabled": "semMusica"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 12
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Narração (%)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "narrationVolume",
+                        "props": {
+                          "width": 70,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "volumeNarracao"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Música (%)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "musicVolume",
+                        "props": {
+                          "width": 70,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "volumeMusica"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Aplicar volumes",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "applyVolumes"
+                    },
+                    "id": "applyVolumesButton"
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450,
+                      "text": "A música repete até o fim. A duração do vídeo segue a timeline."
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450
+                    },
+                    "bind": {
+                      "text": "exportStatus"
                     }
                   },
                   {
                     "type": "Button",
                     "props": {
-                      "text": "Aplicar",
+                      "text": "Cancelar exportação",
                       "height": 36
                     },
                     "events": {
-                      "onClick": "applyDuration"
+                      "onClick": "cancelExport"
                     },
+                    "id": "cancelExportButton",
                     "bind": {
-                      "disabled": "semSelecao"
+                      "visible": "exportando"
                     }
                   }
                 ]
@@ -280,87 +568,96 @@
             ]
           },
           {
-            "type": "Column",
+            "type": "Scroll",
+            "id": "scriptScroll",
             "props": {
-              "spacing": 14,
               "width": 350,
-              "padding": 16,
-              "bgColor": "#edf2f8"
+              "fillHeight": true
             },
             "children": [
               {
-                "type": "Text",
-                "style": {
-                  "fontSize": 22
-                },
+                "type": "Column",
                 "props": {
-                  "text": "ROTEIRO"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 14
+                  "spacing": 14,
+                  "padding": 16,
+                  "bgColor": "#edf2f8"
                 },
-                "props": {
-                  "text": "Uma cena por parágrafo. Use uma linha em branco para separar as cenas.",
-                  "wrapWidth": 300
-                }
-              },
-              {
-                "type": "TextArea",
-                "id": "scriptInput",
-                "props": {
-                  "height": 350,
-                  "width": 320,
-                  "placeholder": "Cole seu roteiro aqui…"
-                },
-                "bind": {
-                  "value": "roteiro"
-                },
-                "validation": {
-                  "required": true,
-                  "label": "Roteiro",
-                  "maxLength": 100000
-                }
-              },
-              {
-                "type": "Button",
-                "props": {
-                  "text": "Criar cenas do roteiro",
-                  "height": 36
-                },
-                "events": {
-                  "onClick": "onSubmit"
-                },
-                "id": "createScenes"
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 16
-                },
-                "props": {
-                  "text": "INTEGRAÇÕES FUTURAS"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 14
-                },
-                "props": {
-                  "text": "IA para imagens · não configurada"
-                }
-              },
-              {
-                "type": "Text",
-                "style": {
-                  "fontSize": 14
-                },
-                "props": {
-                  "text": "Narração por API · não configurada"
-                }
+                "children": [
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 22
+                    },
+                    "props": {
+                      "text": "ROTEIRO"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {
+                      "text": "Uma cena por parágrafo. Use uma linha em branco para separar as cenas.",
+                      "wrapWidth": 300
+                    }
+                  },
+                  {
+                    "type": "TextArea",
+                    "id": "scriptInput",
+                    "props": {
+                      "height": 350,
+                      "width": 320,
+                      "placeholder": "Cole seu roteiro aqui…"
+                    },
+                    "bind": {
+                      "value": "roteiro"
+                    },
+                    "validation": {
+                      "required": true,
+                      "label": "Roteiro",
+                      "maxLength": 100000
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Criar cenas do roteiro",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "onSubmit"
+                    },
+                    "id": "createScenes"
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 16
+                    },
+                    "props": {
+                      "text": "INTEGRAÇÕES FUTURAS"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {
+                      "text": "IA para imagens · não configurada"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 14
+                    },
+                    "props": {
+                      "text": "Narração por API · não configurada"
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -372,7 +669,7 @@
           "fontSize": 14
         },
         "props": {
-          "wrapWidth": 1080
+          "wrapWidth": 850
         },
         "bind": {
           "text": "mensagem"

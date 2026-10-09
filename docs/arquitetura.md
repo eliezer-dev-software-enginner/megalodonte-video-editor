@@ -33,3 +33,31 @@ Narração precisará de um asset de áudio no modelo e de uma decisão explíci
 ## Validação desta etapa
 
 Compilação, `installDist` e 20 testes passaram: quatro no editor, dez no JSONC UI e seis no script-app. A UI foi renderizada em 1320 × 820 e 1180 × 780, com verificação de limites da janela. Os testes exercitam validação do roteiro vazio, criação das cenas, reordenação, duração válida/inválida, remoção até a timeline vazia, bindings de texto e carregamento de imagem local. Capturas ficam em `build/preview/editor-1320.png` e `editor-1180.png`. A persistência foi verificada após remover a imagem original. Instaladores MSI/DEB e APIs externas não foram executados nesta etapa.
+
+
+## Reprodução, scroll e formato horizontal — 8 de outubro de 2026
+
+A view recebeu controles de Play/Pausar, retorno ao início e contador. Um `AnimationTimer` usa tempo monotônico para avançar o playhead e localizar a cena pelos intervalos cumulativos. A pausa preserva a posição; o fim da sequência pausa no último frame e o próximo Play reinicia. Mudanças estruturais ou de duração interrompem a reprodução e reiniciam o relógio. O timer é interrompido no descarte da tela. A reprodução é uma prévia visual da sequência de imagens, sem áudio ou codificação de vídeo.
+
+O projeto agora grava `aspectRatio: "16:9"`. Manifestos anteriores sem esse campo continuam abrindo como 16:9; proporções diferentes são rejeitadas. O quadro da prévia é centralizado e medido em 16:9 em qualquer tamanho de janela. Imagens de outras proporções são encaixadas com barras pretas, sem distorção.
+
+A timeline deixou de criar `ScrollPane`. Usa `megalodonte.components.v2.HorizontalScroll`, adicionado à biblioteca components como variante horizontal do scroll v2. O componente usa panes recortados, faixa arrastável, roda do mouse, gesto horizontal e teclas de seta/Home/End. Seleções durante a reprodução revelam a cena atual. Mudanças na lista recalculam a largura do conteúdo.
+
+O renderer JSONC recebeu `Scroll`, com exatamente um filho e width/height/fillWidth/fillHeight; ele usa o scroll vertical v2 existente. Os painéis central e direito são declarados com esse componente. O conteúdo do scroll vertical foi marcado como unmanaged para preservar as dimensões calculadas pelo viewport. `getContent`, `getScrollY` e `scrollTo` permitem acesso e navegação programática.
+
+O launcher compartilhado agora configura explicitamente janela redimensionável e limites máximos livres. O editor usa mínimo de 920 × 600, permitindo maximização também em monitores com altura disponível inferior ao mínimo anterior de 780. Os conteúdos maiores são acessíveis por scroll. A configuração e o layout foram testados, incluindo quadro 16:9, rolagem de lotes longos e controles de reprodução.
+
+
+## Faixas locais de áudio e exportação MP4 — 8 de outubro de 2026
+
+`VideoProject` recebeu `AudioTrack` para narração e música, com caminho local e volume linear (0 a 1). A UI recebe porcentagens de 0 a 100, aceita vírgula decimal e rejeita NaN, infinito e valores fora do intervalo. Os padrões são 1,0 para narração e 0,15 para música. Zero significa mudo. O manifesto v1 ganhou `audio.narration` e `audio.music`; projetos anteriores sem esses campos mantêm os padrões. Caminhos dos áudios seguem as mesmas regras das imagens e os arquivos são copiados para a pasta de assets ao salvar. A recriação de cenas conserva as faixas.
+
+`AudioPreview` usa dois MediaPlayers, controlados pelo playhead da sequência. Volume, play, pause e seek são independentes por faixa. A música repete e a narração toca uma vez. Players são descartados ao trocar áudio, abrir outro projeto ou fechar a sessão. O projeto adicionou o módulo JavaFX Media ao Gradle e ao manifesto de empacotamento. Compatibilidade de prévia depende dos codecs locais; exportar não depende dos MediaPlayers.
+
+`VideoExporter` recebe um snapshot independente da UI. Converte a primeira imagem de cada arquivo para PNG temporário, renderiza cada cena para H.264/yuv420p, concatena os segmentos e combina as faixas em AAC estéreo. O perfil é fixo: 1920 × 1080, 30 fps e 16:9. Durações são quantizadas ao frame mais próximo (mínimo de um frame), e o resultado é limitado à duração total da timeline. As imagens usam scale/pad com proporção preservada. Música é repetida na entrada FFmpeg; narração é completada com silêncio ou cortada. Volume não é normalizado automaticamente pelo mix; um limitador evita saturação da soma.
+
+O FFmpeg é uma dependência executável externa no PATH. Comandos usam listas de argumentos de ProcessBuilder, sem shell; nomes com espaço, acentos e apóstrofos são aceitos. Um diretório temporário ao lado da saída contém segmentos, logs e resultado. O arquivo final só é substituído após sucesso, de forma atômica quando disponível. Falha ou cancelamento preserva uma saída anterior. O exporter impede a escolha de um asset como saída, e a UI impede usar o manifesto do projeto. O worker é separado da thread JavaFX, publica progresso por runLater e pode ser cancelado; o fechamento da sessão interrompe o processo.
+
+Os testes de integração geram MP4 real, inspecionam resolução/codecs/fps, decodificam frames para conferir a ordem das cenas e medem áudio PCM para confirmar música em 15%, repetição após a narração e mute. Também verificam exportação sem áudio, cancelamento, preservação de arquivo existente e limpeza dos temporários. FFmpeg/FFprobe são necessários para esses testes.
+
+Validação final: 24 testes passaram (oito do editor, dez do JSONC UI, seis do script-app), sem testes de exportação ignorados. A distribuição installDist foi gerada com JavaFX Media. Os instaladores específicos de sistema operacional não foram gerados nesta etapa.
