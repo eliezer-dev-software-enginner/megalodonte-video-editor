@@ -1,6 +1,5 @@
 package megalodonte.cliente;
 import megalodonte.script.ViewScript;
-import javafx.stage.FileChooser;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import java.nio.file.*;
@@ -8,6 +7,8 @@ import java.util.*;
 public final class Editor extends ViewScript {
     private VideoProject project = new VideoProject();
     private Path projectFile;
+    private final FileDialogs dialogs = new FileDialogs();
+    private final LastProjectStore lastProject = new LastProjectStore();
     private final AudioPreview audio = new AudioPreview();
     private volatile boolean disposed;
     private VideoExporter exporter;
@@ -23,14 +24,13 @@ public final class Editor extends ViewScript {
         set("volumeNarracao",Double.toString(project.narration.volume*100)); set("volumeMusica",Double.toString(project.music.volume*100));
         set("semNarracao",project.narration.file.isBlank()); set("semMusica",project.music.file.isBlank());
     }
-    public void attachNarration() { attachAudio(project.narration,"Anexar narração"); }
-    public void attachMusic() { attachAudio(project.music,"Adicionar música de fundo"); }
-    private void attachAudio(VideoProject.AudioTrack track,String title) {
+    public void attachNarration() { attachAudio(project.narration); }
+    public void attachMusic() { attachAudio(project.music); }
+    private void attachAudio(VideoProject.AudioTrack track) {
         if (!readVolumes()) return;
-        var chooser = new FileChooser(); chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Áudio", "*.mp3", "*.wav", "*.m4a", "*.aac", "*.flac", "*.ogg", "*.MP3", "*.WAV"));
-        var file = chooser.showOpenDialog(null); if (file == null) return;
-        if (!Files.isRegularFile(file.toPath())) { message("Arquivo de áudio não encontrado."); return; }
+        var kind=track==project.narration ? FileDialogs.Kind.NARRATION : FileDialogs.Kind.MUSIC;
+        var files=chooseFiles(kind); if(files.isEmpty()) return;
+        java.io.File file=files.getFirst().toFile();
         pausePlayback(); track.file = file.getAbsolutePath(); refreshAudio(); message("Áudio anexado. Ajuste os volumes e clique em Aplicar volumes."); audio.load(project,this::audioError);
     }
     public void removeNarration() { pausePlayback(); project.narration.file=""; refreshAudio(); audio.load(project,this::audioError); }
@@ -45,12 +45,11 @@ public final class Editor extends ViewScript {
     public void applyVolumes() { if (readVolumes()) message("Volumes aplicados à prévia e à exportação."); }
     public void exportVideo() {
         if (exporter != null || !readVolumes()) return;
-        var chooser = new FileChooser(); chooser.setTitle("Exportar vídeo MP4 · YouTube 16:9"); chooser.setInitialFileName("meu-video.mp4");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Vídeo MP4", "*.mp4"));
-        var file = chooser.showSaveDialog(null); if (file == null) return;
-        Path target = file.toPath().toAbsolutePath();
-        if (!target.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".mp4")) target=target.resolveSibling(target.getFileName()+".mp4");
-        if (projectFile != null && target.equals(projectFile.toAbsolutePath())) { message("Escolha um arquivo de saída diferente do manifesto do projeto."); return; }
+        pausePlayback();
+        var files=chooseFiles(FileDialogs.Kind.VIDEO); if(files.isEmpty()) return;
+        Path target=files.getFirst();
+        try { FileSelections.protectAssets(project,target,projectFile,true); }
+        catch (Exception e) { message(e.getMessage()); return; }
         if (Files.exists(target) && !confirm("Substituir o vídeo existente? " + target.getFileName())) return;
         pausePlayback(); project.script=text("roteiro"); var snapshot=project.snapshot(); final Path output=target;
         exporter=new VideoExporter(); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
@@ -103,7 +102,17 @@ public final class Editor extends ViewScript {
     }
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
-    @Override public void onMount() { refreshAudio(); refresh(); }
+    @Override public void onMount() {
+        refreshAudio(); refresh();
+        try {
+            var last=lastProject.lastSaved();
+            if (last.isPresent()) {
+                Path file=last.get();
+                var loaded=VideoProject.load(file); applyProject(loaded,file);
+                message("Último projeto salvo restaurado: " + file + missingAssetsMessage());
+            }
+        } catch (Exception e) { message("Não foi possível restaurar o último projeto salvo. O editor abriu vazio: " + e.getMessage()); }
+    }
     @Override public void onSubmit() {
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
         timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro"));
@@ -143,9 +152,9 @@ public final class Editor extends ViewScript {
     }
     public void removeScene() { if (selected() == null) return; timelineChanged(); int i = index(); project.clips.remove(i); set("selecionada", Math.min(i, project.clips.size() - 1)); refresh(); }
     public void importImages() {
-        var chooser = imageChooser("Importar imagens (ordenadas pelo nome)"); var files = chooser.showOpenMultipleDialog(null); if (files == null) return;
+        var files=chooseFiles(FileDialogs.Kind.IMAGES); if(files.isEmpty()) return;
         try {
-            var paths = files.stream().map(java.io.File::toPath).sorted(Comparator.comparing(p -> p.getFileName().toString())).toList();
+            var paths=files.stream().distinct().sorted(Comparator.comparing(p -> p.getFileName().toString(),String.CASE_INSENSITIVE_ORDER)).toList();
             for (Path path : paths) if (new Image(path.toUri().toString(), 64, 64, true, true, false).isError()) throw new IllegalArgumentException("Imagem inválida: " + path.getFileName());
             timelineChanged(); int cursor = 0;
             for (Path path : paths) {
@@ -157,28 +166,70 @@ public final class Editor extends ViewScript {
         } catch (RuntimeException e) { message(e.getMessage()); }
     }
     public void replaceImage() {
-        var clip = selected(); if (clip == null) return; var file = imageChooser("Imagem da cena selecionada").showOpenDialog(null); if (file == null) return;
-        if (new Image(file.toURI().toString(), 64, 64, true, true, false).isError()) { message("Não foi possível ler a imagem."); return; }
-        timelineChanged(); clip.image = file.getAbsolutePath(); refresh(); message("Imagem substituída.");
+        var clip=selected(); if(clip==null) return;
+        var files=chooseFiles(FileDialogs.Kind.IMAGE); if(files.isEmpty()) return;
+        Path file=files.getFirst();
+        try {
+            if(new Image(file.toUri().toString(),64,64,true,true,false).isError()) throw new IllegalArgumentException("Não foi possível ler a imagem.");
+            timelineChanged(); clip.image=file.toString(); refresh(); message("Imagem substituída.");
+        } catch(RuntimeException e) { message("Não foi possível trocar a imagem: " + e.getMessage()); }
     }
     public void saveProject() {
-        if (!readVolumes()) return;
-        if (projectFile == null) { var chooser = projectChooser("Salvar projeto"); chooser.setInitialFileName("meu-video.mvideo.json");
-            var file = chooser.showSaveDialog(null); if (file == null) return; projectFile = file.toPath(); }
-        try { project.script = text("roteiro"); project.save(projectFile); message("Projeto salvo: " + projectFile); }
-        catch (Exception e) { message("Não foi possível salvar: " + e.getMessage()); projectFile = null; }
+        if(!readVolumes()) return;
+        Path target=projectFile;
+        if(target==null) {
+            var files=chooseFiles(FileDialogs.Kind.PROJECT_SAVE); if(files.isEmpty()) return;
+            target=files.getFirst();
+            try { FileSelections.protectAssets(project,target,projectFile,false); }
+            catch(Exception e) { message(e.getMessage()); return; }
+            if(Files.exists(target) && !confirm("Substituir o projeto existente? " + target.getFileName())) return;
+        }
+        try {
+            FileSelections.protectAssets(project,target,projectFile,false);
+            project.script=text("roteiro"); project.save(target); projectFile=target;
+        } catch(Exception e) { message("Não foi possível salvar: " + e.getMessage()); return; }
+        try { lastProject.remember(projectFile); message("Projeto salvo: " + projectFile); }
+        catch(Exception e) { message("Projeto salvo: " + projectFile + ". Não foi possível guardar o caminho para a próxima inicialização: " + e.getMessage()); }
     }
     public void openProject() {
-        var file = projectChooser("Abrir projeto").showOpenDialog(null); if (file == null) return;
-        try { var loaded = VideoProject.load(file.toPath());
-            if ((!project.clips.isEmpty() || !text("roteiro").isBlank()) && !confirm("Abrir outro projeto e descartar alterações não salvas?")) return;
-            timelineChanged(); project = loaded; refreshAudio(); audio.load(project,this::audioError); projectFile = file.toPath(); set("roteiro", project.script); set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
-            long missing = project.clips.stream().filter(c -> !c.image.isBlank() && !Files.isRegularFile(Path.of(c.image))).count();
-            missing += java.util.stream.Stream.of(project.narration.file,project.music.file).filter(path -> !path.isBlank() && !Files.isRegularFile(Path.of(path))).count();
-            message(missing > 0 ? "Projeto aberto. " + missing + " assets ausentes; anexe novamente as imagens ou os áudios." : "Projeto aberto.");
+        var files=chooseFiles(FileDialogs.Kind.PROJECT_OPEN); if(files.isEmpty()) return;
+        Path file=files.getFirst();
+        try { var loaded = VideoProject.load(file);
+            if ((!project.clips.isEmpty() || !text("roteiro").isBlank() || !project.narration.file.isBlank() || !project.music.file.isBlank()) && !confirm("Abrir outro projeto e descartar alterações não salvas?")) return;
+            applyProject(loaded,file); message("Projeto aberto." + missingAssetsMessage());
         } catch (Exception e) { message("Não foi possível abrir: " + e.getMessage()); }
     }
-    private static FileChooser imageChooser(String title) { var chooser = new FileChooser(); chooser.setTitle(title); chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.PNG", "*.JPG", "*.JPEG")); return chooser; }
-    private static FileChooser projectChooser(String title) { var chooser = new FileChooser(); chooser.setTitle(title); chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Projeto Megalodonte", "*.json")); return chooser; }
-    private static boolean confirm(String message) { return new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.CANCEL, ButtonType.OK).showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK; }
+    private void applyProject(VideoProject loaded,Path file) {
+        timelineChanged(); project=loaded; projectFile=file.toAbsolutePath().normalize();
+        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script);
+        set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
+    }
+    private String missingAssetsMessage() {
+        long missing=project.clips.stream().filter(c -> !c.image.isBlank() && !Files.isRegularFile(Path.of(c.image))).count();
+        missing+=java.util.stream.Stream.of(project.narration.file,project.music.file).filter(path -> !path.isBlank() && !Files.isRegularFile(Path.of(path))).count();
+        return missing>0 ? " " + missing + " assets ausentes; anexe novamente as imagens ou os áudios." : "";
+    }
+    private javafx.stage.Window owner() {
+        var context=megalodonte.application.MegalodonteApp.getCurrentContext();
+        return context==null ? null : context.javafxStage();
+    }
+    private List<Path> chooseFiles(FileDialogs.Kind kind) {
+        pausePlayback();
+        try {
+            var selected=dialogs.choose(kind,owner(),projectFile==null ? null : projectFile.getParent());
+            if(disposed) return List.of();
+            var validated=new ArrayList<Path>();
+            for(Path file:selected) validated.add(kind.save ? FileSelections.destination(file,kind) : FileSelections.readable(file,kind));
+            if(!validated.isEmpty()) {
+                try { dialogs.remember(kind,selected.getFirst().toAbsolutePath().normalize().getParent()); }
+                catch(java.io.IOException e) { message("Arquivo selecionado, mas não foi possível guardar a pasta: " + e.getMessage()); }
+            }
+            return List.copyOf(validated);
+        } catch(Exception e) { if(!disposed) message("Não foi possível selecionar o arquivo: " + e.getMessage()); return List.of(); }
+    }
+    private boolean confirm(String message) {
+        var alert=new Alert(Alert.AlertType.CONFIRMATION,message,ButtonType.CANCEL,ButtonType.OK);
+        var window=owner(); if(window!=null) alert.initOwner(window);
+        return alert.showAndWait().orElse(ButtonType.CANCEL)==ButtonType.OK;
+    }
 }

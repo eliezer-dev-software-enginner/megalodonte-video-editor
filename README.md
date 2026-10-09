@@ -26,6 +26,18 @@ O formato é fixo: **YouTube horizontal 16:9**. A prévia mantém um quadro 16:9
 
 A timeline tem miniaturas, intervalos cumulativos e rolagem horizontal. A roda do mouse e o gesto horizontal do trackpad rolam a timeline; a barra pode ser arrastada. Os painéis central e direito usam o scroll v2 do Megalodonte. A janela pode ser redimensionada ou maximizada, e os painéis rolam quando o conteúdo ultrapassa a área disponível. Imagens ausentes mostram uma prévia vazia e podem ser substituídas. A prévia e a exportação usam imagens, narração e música locais. Não há chamadas a APIs de geração de imagens ou narração. O roteiro editado não altera cenas existentes automaticamente; recriar as cenas pede confirmação.
 
+## Restaurar o último projeto salvo
+
+Após salvar com sucesso, o editor guarda o caminho absoluto do projeto e o restaura na próxima inicialização, incluindo roteiro, cenas, imagens, áudios e volumes. Abrir outro projeto sem salvá-lo não altera essa preferência. Alterações não salvas continuam sem autosave.
+
+A preferência fica em `$XDG_CONFIG_HOME/megalodonte-video-editor/last-project.properties` ou `~/.config/megalodonte-video-editor/last-project.properties` no Linux, e em `%APPDATA%/megalodonte-video-editor/last-project.properties` no Windows. Se o projeto tiver sido removido, movido ou estiver inválido, o editor abre vazio e informa a falha. Assets ausentes são informados após a restauração.
+
+## Seletores de arquivos e últimas pastas
+
+Os sete fluxos usam um contrato único de seleção: abrir projeto, salvar projeto, importar várias imagens, trocar uma imagem, anexar narração, adicionar música e exportar vídeo. Salvamentos usam **Save**; seleções de entrada usam **Open**. Apenas a importação de imagens aceita múltiplos arquivos. Os filtros aceitam extensões em maiúsculas/minúsculas. Salvamentos acrescentam `.json` ou `.mp4` quando necessário e confirmam substituição do destino final.
+
+O editor lembra as últimas pastas entre reinicializações, em `file-dialogs.properties`, na mesma pasta de configurações de `last-project.properties`. Imagens importadas e troca de imagem compartilham a pasta; narração, música, projetos e exportação têm históricos separados. Abrir e salvar projetos compartilham a pasta de projetos. Pastas removidas usam a pasta do projeto atual ou a pasta pessoal como alternativa. Cancelar não troca arquivos do projeto nem atualiza a pasta lembrada.
+
 ## Áudio e exportação
 
 No painel central, use **Anexar narração** e **Adicionar música de fundo** para escolher arquivos locais. Há um botão para remover cada faixa. Os volumes são independentes, de 0 a 100%; narração começa em 100% e música em 15%. Zero silencia a faixa. **Aplicar volumes** atualiza a prévia e a exportação. Play, Salvar projeto e Exportar vídeo também validam e aplicam os valores digitados.

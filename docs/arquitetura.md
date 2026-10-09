@@ -61,3 +61,28 @@ O FFmpeg é uma dependência executável externa no PATH. Comandos usam listas d
 Os testes de integração geram MP4 real, inspecionam resolução/codecs/fps, decodificam frames para conferir a ordem das cenas e medem áudio PCM para confirmar música em 15%, repetição após a narração e mute. Também verificam exportação sem áudio, cancelamento, preservação de arquivo existente e limpeza dos temporários. FFmpeg/FFprobe são necessários para esses testes.
 
 Validação final: 24 testes passaram (oito do editor, dez do JSONC UI, seis do script-app), sem testes de exportação ignorados. A distribuição installDist foi gerada com JavaFX Media. Os instaladores específicos de sistema operacional não foram gerados nesta etapa.
+
+
+## Diálogo de exportação — 9 de outubro de 2026
+
+O fluxo já usava `FileChooser.showSaveDialog`, mas o usuário relatou que o seletor nativo Linux mostrava Open. A exportação passou a usar `ExportSaveDialog`: no Linux, um JFileChooser em SAVE_DIALOG define explicitamente o botão Save; nos demais sistemas continua com o diálogo de salvamento JavaFX. O filtro MP4, o nome inicial, cancelamento, extensão automática e confirmação de substituição foram preservados. O seletor Swing é construído e exibido na EDT; a prévia pausa antes de abrir o diálogo. `java.desktop` foi explicitado no runtime de empacotamento.
+
+
+## Restauração do último projeto salvo — 9 de outubro de 2026
+
+`LastProjectStore` persiste o caminho absoluto do último manifesto salvo em uma preferência por usuário, separada dos assets portáveis. A gravação usa arquivo temporário e substituição atômica quando disponível. O registro só é atualizado depois de `VideoProject.save` terminar com sucesso; uma falha ao guardar a preferência não desfaz o salvamento nem perde o caminho atual da sessão. Abrir um projeto manualmente não atualiza a preferência.
+
+No onMount, o editor tenta carregar o último projeto sem confirmação e aplica o mesmo fluxo de abertura manual: roteiro, cenas, seleção inicial, áudios, volumes e caminho para salvamentos seguintes. Projeto ausente ou inválido resulta em sessão vazia com mensagem; assets ausentes não impedem a restauração. Não há autosave. A propriedade JVM `megalodonte.editor.settingsDir` permite isolar preferências nos testes. Testes verificam persistência entre instâncias, caminhos com espaços/acentos, preservação da preferência em falhas e restauração da UI, incluindo salvar novamente sem abrir um chooser.
+
+
+## Varredura dos seletores e persistência de pastas — 9 de outubro de 2026
+
+A revisão cobriu os sete fluxos de FileChooser do editor. `FileDialogs` centraliza modo, título, filtro, nome inicial e quantidade de arquivos. Substitui o helper especializado `ExportSaveDialog`. Todos os salvamentos usam Swing em SAVE_DIALOG, com Save explícito e confirmação única de substituição feita pelo editor após normalizar a extensão. No Linux, entradas também usam Swing em OPEN_DIALOG; nos demais sistemas, entradas usam o seletor nativo JavaFX. Filtros nativos incluem todas as combinações de maiúsculas/minúsculas.
+
+O bridge Swing usa um loop JavaFX aninhado: o seletor executa na EDT sem bloquear os pulses da aplicação. A prévia pausa; a janela principal é usada para posicionar o diálogo e sua UI fica desabilitada enquanto ele está aberto. O fechamento da janela fecha o seletor e resultados não são aplicados após descarte da sessão. Alertas de confirmação recebem a janela principal como proprietária.
+
+`FileSelections` valida seleção independentemente do filtro: arquivo regular, legível, não vazio e extensão aceita; saída normalizada com extensão, pasta existente e gravável e destino que não seja diretório. Projeto e vídeo não podem sobrescrever assets; vídeo também não pode substituir o manifesto. A primeira gravação de projeto confirma a substituição de arquivo existente; o caminho atual só é alterado após sucesso. Falhas de salvamento conservam o destino atual. A abertura considera também faixas de áudio ao pedir confirmação de descarte. Imagens são decodificadas antes de modificar a timeline; falhas de troca são apresentadas pela UI.
+
+`FileDialogFolders` grava as pastas escolhidas em `file-dialogs.properties`, no diretório de preferências do usuário. Categorias: images (importar/trocar), narration, music, projects (abrir/salvar) e video. O registro é atualizado apenas quando a seleção retornou arquivos e passou pela validação comum; cancelamento não muda a pasta. Guarda-se a pasta navegada, inclusive quando o arquivo é um link simbólico. Configuração ausente, corrompida ou pasta removida permite fallback para pasta do projeto ou home. Gravações são atômicas quando suportadas; falhas da preferência não impedem usar o arquivo escolhido.
+
+Validação: 14 testes do editor passaram, incluindo exportação real, configuração dos sete tipos de diálogo, persistência independente de pastas entre instâncias, extensão automática, entradas vazias/inválidas, proteção de assets e cancelamento de seletor real com heartbeat JavaFX ativo. A distribuição foi atualizada.
