@@ -10,3 +10,6 @@ build/
 __pycache__/
 
 /projects/
+
+/.local-asr/
+/tools/__pycache__/

@@ -41,6 +41,14 @@ class VideoExporterTest {
         var muted=directory.resolve("muted.mp4"); new VideoExporter(320,180).export(project,muted,message->{});
         assertTrue(rms(binaryCommand("ffmpeg","-v","error","-i",muted.toString(),"-vn","-ac","1","-f","s16le","pipe:1"))<.001);
     }
+    @Test void animatedExportKeepsDurationAndUsesFadesWithoutAddingAudio() throws Exception {
+        var project=VideoProject.fromScript("Cena ilustrativa"); project.animateImages=true;
+        project.clips.getFirst().image=image("animated.png",Color.RED).toString(); project.clips.getFirst().duration=1;
+        var file=directory.resolve("animated.mp4"); new VideoExporter(320,180).export(project,file,message->{});
+        assertEquals(1,Double.parseDouble(textCommand("ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",file.toString()).strip()),.04);
+        assertFrameColor(file,0,Color.BLACK); assertFrameColor(file,.5,Color.RED);
+        assertEquals("",textCommand("ffprobe","-v","error","-select_streams","a","-show_entries","stream=codec_name","-of","csv=p=0",file.toString()).strip());
+    }
     @Test void cancellationAndMissingAssetsPreserveExistingOutput() throws Exception {
         var output=directory.resolve("existing.mp4"); Files.writeString(output,"original");
         var project=VideoProject.fromScript("Cena");

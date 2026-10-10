@@ -6,14 +6,17 @@ import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
     @Test void projectRestoresApiKeyAndSupportsLegacyMetadata() throws Exception {
-        var project = VideoProject.fromScript("Cena"); project.openaiApiKey = "dummy-project-key";
+        var project = VideoProject.fromScript("Cena"); project.openaiApiKey = "dummy-project-key"; project.animateImages = true;
         assertEquals(project.openaiApiKey, project.snapshot().openaiApiKey);
+        assertTrue(project.snapshot().animateImages);
         var file = directory.resolve("key.mvideo.json"); project.save(file);
         assertEquals("dummy-project-key", VideoProject.load(file).openaiApiKey);
+        assertTrue(VideoProject.load(file).animateImages);
         project.openaiApiKey = ""; project.save(file);
         assertEquals("", VideoProject.load(file).openaiApiKey);
         Files.writeString(file, "{\"version\":1,\"script\":\"\",\"clips\":[]}");
         assertEquals("", VideoProject.load(file).openaiApiKey);
+        assertFalse(VideoProject.load(file).animateImages);
     }
     @Test void paragraphsPreserveOrderAndDurations() {
         var project = VideoProject.fromScript("Primeira linha\ncontinuação\n\nSegunda cena\r\n\r\nTerceira");

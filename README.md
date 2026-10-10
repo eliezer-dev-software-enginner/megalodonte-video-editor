@@ -104,3 +104,21 @@ bash gradlew test --tests '*OpenAiGeneratedProjectUiTest' -PliveProject=projects
 ```
 
 Os testes normais usam um servidor HTTP local com PNGs de teste e não consomem a API. Capturas da integração real ficam em `build/preview/openai-live-scene-1.png` e `openai-live-scene-2.png`.
+
+### Movimento suave na exportação
+
+O manifesto aceita `animateImages: true` para aplicar aproximação central suave e fades curtos em cada cena. A opção é preservada ao salvar e ao recriar as cenas; projetos antigos usam imagens estáticas por padrão. A duração continua definida na timeline.
+
+### Sincronizar cenas com narração local
+
+Os scripts em `tools/` usam faster-whisper no próprio computador para obter tempos de palavras e comparar a fala com o texto de cada cena. O áudio não é enviado para uma API. Instale uma vez em um ambiente isolado:
+
+```bash
+python3 -m venv .local-asr/venv
+.local-asr/venv/bin/python -m pip install -r tools/requirements-asr.txt
+.local-asr/venv/bin/python tools/transcribe_narration.py projects/meu-projeto/projeto.mvideo.json
+python3 tools/sync_narration.py projects/meu-projeto/projeto.mvideo.json
+python3 tools/sync_narration.py projects/meu-projeto/projeto.mvideo.json --apply
+```
+
+O primeiro uso baixa o modelo multilingual `small`; o cache e o ambiente ficam em `.local-asr`, ignorado pelo Git. Sem `--apply`, somente o relatório é criado. Ao aplicar, o script preserva uma cópia do manifesto e altera apenas as durações das cenas. Ele rejeita áudios diferentes da transcrição ou com baixa correspondência ao roteiro, e verifica alterações concorrentes no manifesto. As trocas são posicionadas entre o fim da fala anterior e o início da próxima, arredondadas a 30 fps; a última cena cobre toda a narração. Timestamps de ASR são estimativas: revise as transições na prévia. Reabra o projeto no editor após executar os scripts.

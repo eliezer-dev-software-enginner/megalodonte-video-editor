@@ -158,7 +158,7 @@ public final class Editor extends ViewScript {
     }
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
-        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.openaiApiKey=text("openaiKey").strip();
+        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.openaiApiKey=text("openaiKey").strip(); project.animateImages=previous.animateImages;
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
         project.music.file=previous.music.file; project.music.volume=previous.music.volume; set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
         message("Cenas criadas localmente, uma por parágrafo. Importe as imagens na ordem desejada.");

@@ -38,9 +38,18 @@ public final class VideoExporter {
                 if(image==null) throw new IOException("Imagem inválida: "+clip.image);
                 var frame=work.resolve("frame.png"); ImageIO.write(image,"png",frame.toFile()); image.flush();
                 String name=String.format(Locale.ROOT,"scene-%06d.mp4",i);
+                long frames=Math.max(1,Math.round(clip.duration*30));
+                String filter="scale="+width+":"+height+":force_original_aspect_ratio=decrease,pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2:black,setsar=1";
+                if(project.animateImages) {
+                    String zoom="1+0.05*on/"+Math.max(1,frames-1);
+                    filter="scale="+(width*2)+":"+(height*2)+":force_original_aspect_ratio=increase,crop="+(width*2)+":"+(height*2)
+                        +",zoompan=z='"+zoom+"':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:s="+width+"x"+height+":fps=30,setsar=1";
+                    double fade=Math.min(.25,clip.duration/4);
+                    filter+=",fade=t=in:st=0:d="+fade+",fade=t=out:st="+Math.max(0,frames/30.0-fade)+":d="+fade;
+                }
                 var command=command(); Collections.addAll(command,"-loop","1","-framerate","30","-i",frame.toString(),
-                    "-frames:v",Long.toString(Math.max(1,Math.round(clip.duration*30))),
-                    "-vf","scale="+width+":"+height+":force_original_aspect_ratio=decrease,pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+                    "-frames:v",Long.toString(frames),
+                    "-vf",filter,
                     "-c:v","libx264","-preset","fast","-crf","20","-pix_fmt","yuv420p","-threads","2","-an",work.resolve(name).toString());
                 run(command,work); concat.append("file '").append(name).append("'\n");
             }

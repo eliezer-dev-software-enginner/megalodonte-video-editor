@@ -33,7 +33,9 @@ tasks.register<JavaExec>("imageIntegrationSmoke") {
 }
 
 tasks.test {
-    systemProperty("megalodonte.live.project", providers.gradleProperty("liveProject").orElse("").get())
+    val liveProject = providers.gradleProperty("liveProject").orElse("").get()
+    systemProperty("megalodonte.live.project", liveProject)
+    if (liveProject.isNotBlank()) outputs.upToDateWhen { false }
 }
 tasks.named<JavaExec>("run") {
     providers.gradleProperty("initialProject").orNull?.let { systemProperty("megalodonte.editor.initialProject", file(it).absolutePath) }
