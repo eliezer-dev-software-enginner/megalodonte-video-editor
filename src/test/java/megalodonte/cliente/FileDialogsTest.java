@@ -1,28 +1,30 @@
 package megalodonte.cliente;
 
-import javax.swing.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
-import java.io.File;
 import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FileDialogsTest {
     @TempDir Path directory;
     @Test void everyActionHasCorrectModeFilterAndSelectionCount() throws Exception {
-        SwingUtilities.invokeAndWait(()-> {
-            for(var kind:FileDialogs.Kind.values()) {
-                var chooser=FileDialogs.swingChooser(kind,directory);
-                assertEquals(kind.save ? JFileChooser.SAVE_DIALOG : JFileChooser.OPEN_DIALOG,chooser.getDialogType());
-                assertEquals(kind.save ? "Save" : "Open",chooser.getApproveButtonText());
-                assertEquals(kind.multiple,chooser.isMultiSelectionEnabled()); assertFalse(chooser.isAcceptAllFileFilterUsed());
-                for(String ext:kind.extensions) assertTrue(chooser.getFileFilter().accept(new File("arquivo."+ext.toUpperCase())));
-                assertFalse(chooser.getFileFilter().accept(new File("arquivo.xyz")));
-                assertEquals(directory.toFile(),chooser.getCurrentDirectory());
-                if(kind.save) assertEquals(kind.filename,chooser.getSelectedFile().getName());
+        for(var kind:FileDialogs.Kind.values()) {
+            var chooser=FileDialogs.nativeChooser(kind,directory);
+            assertEquals(kind.title,chooser.getTitle());
+            assertEquals(directory.toFile(),chooser.getInitialDirectory());
+            assertEquals(1,chooser.getExtensionFilters().size());
+            assertEquals(chooser.getExtensionFilters().getFirst(),chooser.getSelectedExtensionFilter());
+            for(String ext:kind.extensions) {
+                assertTrue(chooser.getSelectedExtensionFilter().getExtensions().contains("*."+ext));
+                assertTrue(chooser.getSelectedExtensionFilter().getExtensions().contains("*."+ext.toUpperCase()));
             }
-        });
+            if(kind.save) assertEquals(kind.filename,chooser.getInitialFileName());
+        }
+        assertTrue(FileDialogs.Kind.PROJECT_SAVE.save); assertTrue(FileDialogs.Kind.VIDEO.save);
+        assertTrue(FileDialogs.Kind.IMAGES.multiple);
+        for(var kind:FileDialogs.Kind.values()) if(kind!=FileDialogs.Kind.PROJECT_SAVE && kind!=FileDialogs.Kind.VIDEO) assertFalse(kind.save);
     }
+
     @Test void saveExtensionsAndInputValidationHandleCaseAndMissingFiles() throws Exception {
         assertEquals(directory.resolve("video.mp4"),FileSelections.destination(directory.resolve("video"),FileDialogs.Kind.VIDEO));
         assertEquals(directory.resolve("VIDEO.MP4"),FileSelections.destination(directory.resolve("VIDEO.MP4"),FileDialogs.Kind.VIDEO));

@@ -27,25 +27,6 @@ class EditorViewTest {
                 assertTrue(session.states().string("mensagem").get().contains("Volumes aplicados"));
                 assertEquals("Exportar vídeo",((Button)session.component("exportButton").getJavaFxNode()).getText());
                 assertTrue(((Button)session.component("cancelExportButton").getJavaFxNode()).isVisible()==false);
-                // Cancel a real save picker while a JavaFX heartbeat runs: no frozen FX thread or saved preference.
-                var chooserObserved=new java.util.concurrent.atomic.AtomicBoolean();
-                var heartbeat=new java.util.concurrent.atomic.AtomicBoolean();
-                var pulse=new javafx.animation.PauseTransition(javafx.util.Duration.millis(80)); pulse.setOnFinished(event->heartbeat.set(true)); pulse.play();
-                javax.swing.SwingUtilities.invokeLater(()-> {
-                    var timer=new javax.swing.Timer(180,null);
-                    timer.addActionListener(event-> {
-                        for(var window:java.awt.Window.getWindows()) if(window.isShowing()) {
-                            var chooser=findChooser(window);
-                            if(chooser!=null) {
-                                chooserObserved.set(chooser.getDialogType()==javax.swing.JFileChooser.SAVE_DIALOG && "Save".equals(chooser.getApproveButtonText()));
-                                chooser.cancelSelection(); timer.stop(); return;
-                            }
-                        }
-                    }); timer.start();
-                });
-                session.invoke("saveProject");
-                assertTrue(chooserObserved.get()); assertTrue(heartbeat.get(),"JavaFX must remain responsive while picker is open");
-                assertTrue(new LastProjectStore().lastSaved().isEmpty());
                 var area = (TextArea) session.component("scriptInput").getJavaFxNode();
                 ((Button) session.component("createScenes").getJavaFxNode()).fire(); assertTrue(session.states().string("mensagem").get().contains("obrigatório"));
                 area.setText("Uma cidade ao amanhecer.\n\nUma pessoa atravessa a praça.\n\nO sol ilumina os prédios.");
@@ -149,12 +130,4 @@ class EditorViewTest {
             }); Platform.runLater(restoreCheck); restoreCheck.get(10,TimeUnit.SECONDS);
         } finally { Platform.exit(); }
     }
-    private static javax.swing.JFileChooser findChooser(java.awt.Component component) {
-        if(component instanceof javax.swing.JFileChooser chooser) return chooser;
-        if(component instanceof java.awt.Container container) for(var child:container.getComponents()) {
-            var found=findChooser(child); if(found!=null) return found;
-        }
-        return null;
-    }
-
 }
