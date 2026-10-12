@@ -33,6 +33,19 @@ class VideoExporterTest {
         byte[] early=binaryCommand("ffmpeg","-v","error","-ss","0.05","-i",output.toString(),"-t","0.2","-vn","-ac","1","-ar","48000","-f","s16le","pipe:1");
         assertTrue(rms(early)>rms*4,"Narration should remain substantially louder than music");
     }
+    @Test void effectsRespectPlacementTrimOverlapVolumeAndEnd() throws Exception {
+        var p=VideoProject.fromScript("Cena");p.clips.getFirst().duration=2;p.clips.getFirst().image=image("effects.png",Color.BLUE).toString();
+        var effect=new VideoProject.SoundEffect();effect.file=wave("effect.wav",440,.4,2).toString();effect.start=.4;effect.offset=.2;effect.duration=.8;effect.volume=.25;effect.fadeIn=0;effect.fadeOut=0;p.effects.add(effect);
+        var overlap=effect.copy();overlap.start=.8;p.effects.add(overlap);
+        var muted=effect.copy();muted.start=0;muted.volume=0;p.effects.add(muted);
+        var output=directory.resolve("effects.mp4");new VideoExporter(320,180).export(p,output,m->{});
+        double before=audioRms(output,.1),single=audioRms(output,.5),both=audioRms(output,.9),after=audioRms(output,1.8);
+        assertTrue(before<.001);assertTrue(single>.045 && single<.055,"Individual gain after mono-to-stereo conversion: "+single);assertTrue(both>single*1.8,"Effects overlap");assertTrue(after<.001);
+        effect.file=directory.resolve("missing.wav").toString();assertThrows(IOException.class,()->new VideoExporter(320,180).export(p,output,m->{}));
+    }
+    private double audioRms(Path output,double start) throws Exception {
+        return rms(binaryCommand("ffmpeg","-v","error","-ss",Double.toString(start),"-i",output.toString(),"-t","0.1","-vn","-ac","1","-ar","48000","-f","s16le","pipe:1"));
+    }
     @Test void exportsWithoutAudioAndMuteProducesSilence() throws Exception {
         var project=VideoProject.fromScript("Cena"); project.clips.getFirst().image=image("still.png",Color.GREEN).toString(); project.clips.getFirst().duration=.3;
         var silent=directory.resolve("silent.mp4"); new VideoExporter(320,180).export(project,silent,message->{});

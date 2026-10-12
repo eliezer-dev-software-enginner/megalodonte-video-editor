@@ -32,6 +32,15 @@ class OpenAiGeneratedProjectUiTest {
                 session.invoke("generateImages"); assertTrue(session.states().string("mensagem").get().contains("Todas as cenas"));
                 var sequence=(megalodonte.components.v2.HorizontalScroll)session.component("timeline");
                 assertEquals(expected.clips.size(),((HBox)sequence.getContent()).getChildren().size());
+                var effects=(megalodonte.components.v2.HorizontalScroll)session.component("effectsTimeline");
+                assertEquals(expected.effects.size(),((Pane)effects.getContent()).getChildren().stream().filter(n->n.getUserData() instanceof Integer).count());
+                if(!expected.effects.isEmpty()) {
+                    session.states().set("efeitoSelecionado",0);session.invoke("selectEffect");root.applyCss();root.layout();
+                    var editorScroll=(megalodonte.components.v2.Scroll)session.component("editorScroll");editorScroll.scrollTo(640);root.layout();
+                    var shot=root.snapshot(null,null);var png=new BufferedImage((int)shot.getWidth(),(int)shot.getHeight(),BufferedImage.TYPE_INT_ARGB);
+                    for(int y=0;y<png.getHeight();y++)for(int x=0;x<png.getWidth();x++)png.setRGB(x,y,shot.getPixelReader().getArgb(x,y));
+                    Files.createDirectories(Path.of("build/preview"));ImageIO.write(png,"png",Path.of("build/preview/live-effects.png").toFile());editorScroll.scrollTo(0);
+                }
                 for(int i=0;i<expected.clips.size();i++) {
                     session.states().set("selecionada",i);session.invoke("selectScene");root.applyCss();root.layout();
                     assertEquals(expected.clips.get(i).image,session.states().get("imagem"));

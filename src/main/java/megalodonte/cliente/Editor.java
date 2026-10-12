@@ -7,6 +7,20 @@ import java.util.*;
 public final class Editor extends ViewScript {
     private VideoProject project = new VideoProject();
     private Path projectFile;
+    private final EditorSettings settingsStore=new EditorSettings();
+    private EditorSettings.Values settings=new EditorSettings.Values("",EditorSettings.DEFAULT_SOUNDS,EditorSettings.defaultPrompt());
+    private SettingsWindow settingsWindow;
+    private boolean settingsLoaded;
+    public void openSettings() {
+        if(generationBusy()) return;
+        pausePlayback();
+        if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
+        settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,settings.basePrompt),values -> {
+            settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);project.openaiApiKey=values.apiKey;
+            message("Configurações salvas. Prompt base e biblioteca de sons disponíveis para a geração de vídeo.");
+        });
+        settingsWindow.show();
+    }
     private final FileDialogs dialogs = new FileDialogs();
     private final LastProjectStore lastProject = new LastProjectStore();
     private final AudioPreview audio = new AudioPreview();
@@ -56,6 +70,7 @@ public final class Editor extends ViewScript {
     }
 
     @Override public void onDestroy() {
+        if(settingsWindow!=null) settingsWindow.close();
         disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt(); if (playback != null) playback.stop(); playing = false;
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
     }
@@ -65,6 +80,52 @@ public final class Editor extends ViewScript {
         set("musicaNome",project.music.file.isBlank() ? "Nenhuma música anexada" : "Música: " + Path.of(project.music.file).getFileName());
         set("volumeNarracao",Double.toString(project.narration.volume*100)); set("volumeMusica",Double.toString(project.music.volume*100));
         set("semNarracao",project.narration.file.isBlank()); set("semMusica",project.music.file.isBlank());
+    }
+    private VideoProject.SoundEffect selectedEffect() {
+        int i=(Integer)get("efeitoSelecionado");return i>=0 && i<project.effects.size() ? project.effects.get(i) : null;
+    }
+    private void refreshEffects() {
+        set("efeitosTimeline",project.effectsTimeline());
+        var effect=selectedEffect();set("semEfeito",effect==null);
+        set("efeitoNome",effect==null ? "Selecione um som para ajustar" : Path.of(effect.file).getFileName().toString());
+        set("efeitoInicio",Double.toString(effect==null ? playhead : effect.start));
+        set("efeitoRecorte",Double.toString(effect==null ? 0 : effect.offset));
+        set("efeitoDuracao",Double.toString(effect==null ? 3 : effect.duration));
+        set("efeitoVolume",Double.toString(effect==null ? 15 : effect.volume*100));
+        set("efeitoFadeIn",Double.toString(effect==null ? .1 : effect.fadeIn));
+        set("efeitoFadeOut",Double.toString(effect==null ? .2 : effect.fadeOut));
+    }
+    public void selectEffect() {
+        pausePlayback();var effect=selectedEffect();if(effect!=null) {playhead=Math.min(effect.start,project.duration());audio.seek(playhead);updatePlayhead();}refreshEffects();
+    }
+    public void addEffect() {
+        if(generationBusy()) return;
+        if(project.clips.isEmpty()) {message("Crie cenas antes de adicionar efeitos.");return;}
+        var files=chooseFiles(FileDialogs.Kind.EFFECT);if(files.isEmpty())return;
+        addEffectFile(files.getFirst());
+    }
+    void addEffectFile(Path path) {
+        pausePlayback();var effect=new VideoProject.SoundEffect();effect.file=path.toAbsolutePath().toString();
+        effect.start=Math.min(playhead,Math.max(0,project.duration()-.1));effect.duration=Math.min(3,project.duration()-effect.start);
+        effect.fadeIn=Math.min(.1,effect.duration/4);effect.fadeOut=Math.min(.2,effect.duration/4);
+        project.effects.add(effect);set("efeitoSelecionado",project.effects.size()-1);refreshEffects();audio.load(project,this::audioError);
+        message("Som adicionado na posição atual. Ajuste a duração e clique em Aplicar efeito.");
+    }
+    private double effectNumber(String state) {return Double.parseDouble(text(state).strip().replace(',','.'));}
+    public void applyEffect() {
+        if(generationBusy()) return;var current=selectedEffect();if(current==null)return;
+        try {
+            var value=current.copy();value.start=effectNumber("efeitoInicio");value.offset=effectNumber("efeitoRecorte");value.duration=effectNumber("efeitoDuracao");
+            value.volume=VideoProject.volumeFromPercent(text("efeitoVolume"));value.fadeIn=effectNumber("efeitoFadeIn");value.fadeOut=effectNumber("efeitoFadeOut");value.validate();
+            if(value.start>=project.duration())throw new IllegalArgumentException("O efeito deve começar dentro do vídeo.");
+            pausePlayback();project.effects.set((Integer)get("efeitoSelecionado"),value);refreshEffects();audio.load(project,this::audioError);
+            message("Efeito atualizado. O áudio é limitado ao fim do vídeo e do arquivo de origem.");
+        } catch(IllegalArgumentException e) { message("Não foi possível aplicar o efeito: "+e.getMessage()); }
+    }
+    public void removeEffect() {
+        if(generationBusy() || selectedEffect()==null)return;
+        pausePlayback();int i=(Integer)get("efeitoSelecionado");project.effects.remove(i);set("efeitoSelecionado",Math.min(i,project.effects.size()-1));
+        refreshEffects();audio.load(project,this::audioError);message("Efeito removido.");
     }
     public void attachNarration() { if(generationBusy()) return; attachAudio(project.narration); }
     public void attachMusic() { if(generationBusy()) return; attachAudio(project.music); }
@@ -145,6 +206,8 @@ public final class Editor extends ViewScript {
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
     @Override public void onMount() {
+        try { settings=settingsStore.load();settingsLoaded=settingsStore.exists();set("openaiKey",settings.apiKey); }
+        catch(java.io.IOException e) { message("Não foi possível carregar as configurações: "+e.getMessage()); }
         refreshAudio(); refresh();
         try {
             String initial=System.getProperty("megalodonte.editor.initialProject","");
@@ -160,7 +223,7 @@ public final class Editor extends ViewScript {
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
         timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.openaiApiKey=text("openaiKey").strip(); project.animateImages=previous.animateImages;
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
-        project.music.file=previous.music.file; project.music.volume=previous.music.volume; set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
+        project.music.file=previous.music.file; project.music.volume=previous.music.volume;project.effects.addAll(previous.effects);audio.load(project,this::audioError); set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
         message("Cenas criadas localmente, uma por parágrafo. Importe as imagens na ordem desejada.");
     }
     public void selectScene() {
@@ -173,7 +236,7 @@ public final class Editor extends ViewScript {
     private void refresh() {
         set("semCenas",project.clips.isEmpty());
         set("tempo",String.format(Locale.ROOT,"%.1fs / %.1fs",playhead,project.duration()));
-        set("timeline", project.timeline()); set("resumo", project.clips.size() + " cenas · " + String.format(Locale.ROOT, "%.1f segundos", project.duration())); refreshSelection();
+        refreshEffects();set("timeline", project.timeline()); set("resumo", project.clips.size() + " cenas · " + String.format(Locale.ROOT, "%.1f segundos", project.duration())); refreshSelection();
     }
     private void refreshSelection() {
         var clip = selected(); set("semSelecao", clip == null); set("imagem", clip == null ? "" : clip.image);
@@ -244,11 +307,12 @@ public final class Editor extends ViewScript {
     }
     private void applyProject(VideoProject loaded,Path file) {
         timelineChanged(); project=loaded; projectFile=file.toAbsolutePath().normalize();
-        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",project.openaiApiKey);
-        set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
+        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settingsLoaded ? settings.apiKey : project.openaiApiKey);
+        set("efeitoSelecionado",project.effects.isEmpty() ? -1 : 0);set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }
     private String missingAssetsMessage() {
         long missing=project.clips.stream().filter(c -> !c.image.isBlank() && !Files.isRegularFile(Path.of(c.image))).count();
+        missing+=project.effects.stream().filter(e->!Files.isRegularFile(Path.of(e.file))).count();
         missing+=java.util.stream.Stream.of(project.narration.file,project.music.file).filter(path -> !path.isBlank() && !Files.isRegularFile(Path.of(path))).count();
         return missing>0 ? " " + missing + " assets ausentes; anexe novamente as imagens ou os áudios." : "";
     }
@@ -259,7 +323,7 @@ public final class Editor extends ViewScript {
     private List<Path> chooseFiles(FileDialogs.Kind kind) {
         pausePlayback();
         try {
-            var selected=dialogs.choose(kind,owner(),projectFile==null ? null : projectFile.getParent());
+            var selected=dialogs.choose(kind,owner(),kind==FileDialogs.Kind.EFFECT ? Path.of(settings.soundsDirectory) : projectFile==null ? null : projectFile.getParent());
             if(disposed) return List.of();
             var validated=new ArrayList<Path>();
             for(Path file:selected) validated.add(kind.save ? FileSelections.destination(file,kind) : FileSelections.readable(file,kind));

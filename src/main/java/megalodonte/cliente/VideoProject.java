@@ -18,6 +18,34 @@ public final class VideoProject {
         public double volume;
         public AudioTrack(double volume) { this.volume = volume; }
     }
+    public static final class SoundEffect {
+        public String file = "";
+        public double start, offset, duration = 3, volume = .15, fadeIn = .1, fadeOut = .2;
+        public SoundEffect copy() {
+            var c=new SoundEffect(); c.file=file;c.start=start;c.offset=offset;c.duration=duration;c.volume=volume;c.fadeIn=fadeIn;c.fadeOut=fadeOut;return c;
+        }
+        public void validate() {
+            if(!Double.isFinite(start) || start<0 || start>86400 || !Double.isFinite(offset) || offset<0 || offset>86400
+                || !Double.isFinite(duration) || duration<.1 || duration>3600) throw new IllegalArgumentException("Início/recorte inválido ou duração fora de 0,1 a 3600s.");
+            validateVolume(volume);
+            if(!Double.isFinite(fadeIn) || !Double.isFinite(fadeOut) || fadeIn<0 || fadeOut<0 || fadeIn+fadeOut>duration) throw new IllegalArgumentException("Fades devem caber na duração do efeito.");
+        }
+        public boolean active(double time) { return time>=start && time<start+duration; }
+        public double gain(double time) {
+            if(!active(time)) return 0;
+            double local=time-start;
+            return volume*Math.min(fadeIn==0 ? 1 : Math.min(1,local/fadeIn),fadeOut==0 ? 1 : Math.min(1,(duration-local)/fadeOut));
+        }
+    }
+    public final List<SoundEffect> effects = new ArrayList<>();
+    public String effectsTimeline() {
+        var items=new JsonArray();
+        for(var effect:effects) {
+            var item=new JsonObject();item.addProperty("label",Path.of(effect.file).getFileName().toString());
+            item.addProperty("start",effect.start);item.addProperty("duration",effect.duration);item.addProperty("volume",effect.volume);items.add(item);
+        }
+        return items.toString();
+    }
     public final AudioTrack narration = new AudioTrack(1.0);
     public final AudioTrack music = new AudioTrack(.15);
     public static double volumeFromPercent(String text) {
@@ -30,6 +58,7 @@ public final class VideoProject {
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
         for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; copy.clips.add(next); }
+        for(var effect:effects) copy.effects.add(effect.copy());
         return copy;
     }
     public static final String ASPECT_RATIO = "16:9";
@@ -65,7 +94,10 @@ public final class VideoProject {
         var metadata = new JsonObject(); metadata.addProperty("openaiApiKey", openaiApiKey); root.add("metadata", metadata);
         var audio = new JsonObject();
         audio.add("narration", audioJson(narration,absolute,assets));
-        audio.add("music", audioJson(music,absolute,assets)); root.add("audio", audio);
+        audio.add("music", audioJson(music,absolute,assets));
+        var sounds=new JsonArray();
+        for(var effect:effects) { effect.validate();var json=new Gson().toJsonTree(effect).getAsJsonObject();json.addProperty("file",copyAsset(effect.file,absolute,assets));sounds.add(json); }
+        audio.add("effects",sounds);root.add("audio", audio);
         Path temporary = Files.createTempFile(absolute.getParent(), ".video-project-", ".tmp");
         try {
             Files.writeString(temporary, new GsonBuilder().setPrettyPrinting().create().toJson(root));
@@ -96,6 +128,11 @@ public final class VideoProject {
                 var audio = root.getAsJsonObject("audio");
                 readAudio(audio.getAsJsonObject("narration"),project.narration,file);
                 readAudio(audio.getAsJsonObject("music"),project.music,file);
+                if(audio.has("effects")) for(var element:audio.getAsJsonArray("effects")) {
+                    var effect=new Gson().fromJson(element,SoundEffect.class);effect.validate();
+                    if(effect.file==null || effect.file.isBlank()) throw new IllegalArgumentException("Efeito sem arquivo");
+                    effect.file=resolveAsset(effect.file,file);project.effects.add(effect);
+                }
             }
             return project;
         } catch (RuntimeException e) { throw new IOException("Projeto inválido: " + e.getMessage(), e); }

@@ -27,6 +27,11 @@ public final class VideoExporter {
             if(!Double.isFinite(track.volume) || track.volume<0 || track.volume>1) throw new IOException("Volume inválido.");
             if(!track.file.isBlank()) { if(!Files.isRegularFile(Path.of(track.file))) throw new IOException("Áudio ausente: "+track.file); rejectOutputSource(target,track.file); }
         }
+        for(var effect:project.effects) {
+            try { effect.validate(); } catch(IllegalArgumentException e) { throw new IOException(e.getMessage(),e); }
+            if(effect.file.isBlank() || !Files.isRegularFile(Path.of(effect.file))) throw new IOException("Efeito sonoro ausente: "+effect.file);
+            rejectOutputSource(target,effect.file);
+        }
         Files.createDirectories(target.getParent());
         Path work=Files.createTempDirectory(target.getParent(),".megalodonte-export-");
         try {
@@ -65,6 +70,16 @@ public final class VideoExporter {
                 String label="a"+input;
                 filters.add("["+input+":a:0]aresample=48000,aformat=channel_layouts=stereo,volume="+Double.toString(track.volume)+",apad,atrim=duration="+duration+",asetpts=PTS-STARTPTS["+label+"]");
                 labels.add("["+label+"]"); input++;
+            }
+            for(var effect:project.effects) {
+                if(effect.start>=project.duration()) continue;
+                Collections.addAll(command,"-i",Path.of(effect.file).toAbsolutePath().toString());
+                String label="a"+input;
+                String filter="["+input+":a:0]aresample=48000,aformat=channel_layouts=stereo,atrim=start="+effect.offset+":duration="+effect.duration+",asetpts=PTS-STARTPTS,volume="+effect.volume;
+                if(effect.fadeIn>0) filter+=",afade=t=in:d="+effect.fadeIn;
+                if(effect.fadeOut>0) filter+=",afade=t=out:st="+(effect.duration-effect.fadeOut)+":d="+effect.fadeOut;
+                filter+=",adelay="+Math.round(effect.start*48000)+"S:all=1,asetpts=N/SR/TB,apad,atrim=duration="+duration+"["+label+"]";
+                filters.add(filter);labels.add("["+label+"]");input++;
             }
             Collections.addAll(command,"-map","0:v:0","-c:v","copy");
             if(!labels.isEmpty()) {

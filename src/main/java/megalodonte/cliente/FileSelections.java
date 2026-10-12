@@ -26,7 +26,7 @@ final class FileSelections {
     static void protectAssets(VideoProject project,Path destination,Path manifest,boolean exporting) throws IOException {
         if(exporting && manifest!=null && same(destination,manifest)) throw new IOException("O vídeo não pode substituir o manifesto do projeto.");
         var images=project.clips.stream().map(clip->clip.image);
-        for(String name:Stream.concat(images,Stream.of(project.narration.file,project.music.file)).filter(value->!value.isBlank()).toList())
+        for(String name:Stream.concat(Stream.concat(images,project.effects.stream().map(e->e.file)),Stream.of(project.narration.file,project.music.file)).filter(value->!value.isBlank()).toList())
             if(same(destination,Path.of(name))) throw new IOException("O destino não pode substituir um asset do projeto.");
     }
     private static boolean same(Path a,Path b) throws IOException {

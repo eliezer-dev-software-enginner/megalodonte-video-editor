@@ -21,6 +21,35 @@ class EditorViewTest {
             try (var app = new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()), Editor.class.getClassLoader())) {
                 var root = (Parent) app.render().getJavaFxNode(); new Scene(root,1320,820); app.onMount();
                 var session = app.current();
+                assertEquals("Configurações",((Button)session.component("settingsButton").getJavaFxNode()).getText());
+                assertThrows(IllegalArgumentException.class,()->session.component("openaiKeyInput"));
+                session.invoke("openSettings");
+                var settingsStage=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream()
+                    .filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
+                var settingsRoot=settingsStage.getScene().getRoot(); settingsRoot.applyCss();settingsRoot.layout();
+                var keyField=(PasswordField)settingsRoot.lookup(".password-field");
+                var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField && !(n instanceof PasswordField)).map(n->(TextField)n).findFirst().orElseThrow();
+                var promptField=(TextArea)settingsRoot.lookup(".text-area");
+                assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
+                assertTrue(promptField.getText().contains("CANAL DARK DE CURIOSIDADES"));assertTrue(promptField.getText().contains("DIREÇÃO SONORA"));
+                keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
+                folderField.setText("/diretorio-inexistente-para-teste");
+                var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
+                saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
+                var soundsFolder=Files.createTempDirectory("editor-sounds-");folderField.setText(soundsFolder.toString());
+                var settingsShot=settingsRoot.snapshot(null,null);var settingsPng=new BufferedImage((int)settingsShot.getWidth(),(int)settingsShot.getHeight(),BufferedImage.TYPE_INT_ARGB);
+                for(int y=0;y<settingsPng.getHeight();y++)for(int x=0;x<settingsPng.getWidth();x++)settingsPng.setRGB(x,y,settingsShot.getPixelReader().getArgb(x,y));
+                Files.createDirectories(Path.of("build/preview"));ImageIO.write(settingsPng,"png",Path.of("build/preview/settings-window.png").toFile());
+                saveSettings.fire();assertFalse(settingsStage.isShowing());assertEquals("dummy-settings-key",session.states().get("openaiKey"));
+                var persisted=new EditorSettings().load();assertEquals(soundsFolder.toString(),persisted.soundsDirectory);assertEquals("Prompt editado e salvo",persisted.basePrompt);
+                try(var restarted=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
+                    restarted.render();restarted.onMount();assertEquals("dummy-settings-key",restarted.current().states().get("openaiKey"));
+                }
+                session.invoke("openSettings");
+                var reopened=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream().filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
+                reopened.getScene().getRoot().applyCss();((TextArea)reopened.getScene().getRoot().lookup(".text-area")).setText("Não salvar");reopened.close();
+                assertEquals("Prompt editado e salvo",new EditorSettings().load().basePrompt);
+                Files.delete(Path.of(System.getProperty("megalodonte.editor.settingsDir"),"editor-settings.json"));session.states().set("openaiKey","");
                 assertEquals("15.0",session.states().get("volumeMusica"));
                 session.states().set("volumeMusica","101"); session.invoke("applyVolumes"); assertTrue(session.states().string("mensagem").get().contains("entre 0 e 100"));
                 session.states().set("volumeMusica","15"); session.states().set("volumeNarracao","80"); session.invoke("applyVolumes");
@@ -107,6 +136,9 @@ class EditorViewTest {
             Platform.runLater(playbackCheck); playbackCheck.get(10,TimeUnit.SECONDS).get(10,TimeUnit.SECONDS);
             var restoreCheck=new FutureTask<Void>(() -> {
                 var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07; stored.openaiApiKey="dummy-restored-key";
+                Path sound=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"cue.wav");
+                Files.write(sound,new byte[]{1,2,3});
+                for(int i=0;i<4;i++) {var effect=new VideoProject.SoundEffect();effect.file=sound.toString();effect.start=1;stored.effects.add(effect);}
                 Path file=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"restaurado.json"); stored.save(file);
                 new LastProjectStore().remember(file);
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
@@ -116,9 +148,18 @@ class EditorViewTest {
                     assertEquals(7,Double.parseDouble(session.states().string("volumeMusica").get()),.0001);
                     assertTrue(session.states().string("resumo").get().startsWith("2 cenas"));
                     assertTrue(session.states().string("mensagem").get().contains("restaurado"));
+                    var effects=(megalodonte.components.v2.HorizontalScroll)session.component("effectsTimeline");
+                    var lane=(Pane)effects.getContent();assertEquals(4,lane.getChildren().stream().filter(n->n.getUserData() instanceof Integer).count());
+                    assertTrue(((Region)effects.getJavaFxNode()).getMinHeight()>=314,"Overlapping effects remain visible");
+                    session.states().set("efeitoSelecionado",1);session.invoke("selectEffect");
+                    session.states().set("efeitoInicio","2.5");session.states().set("efeitoDuracao","1.5");session.states().set("efeitoVolume","8");session.invoke("applyEffect");
+                    session.states().set("efeitoInicio","NaN");session.invoke("applyEffect");assertTrue(session.states().string("mensagem").get().contains("Não foi possível"));
+                    session.invoke("selectEffect");assertEquals("2.5",session.states().get("efeitoInicio"));
                     session.states().set("roteiro","Salvo no projeto restaurado"); session.states().set("openaiKey","dummy-updated-key"); session.invoke("saveProject");
                     assertEquals("dummy-updated-key",VideoProject.load(file).openaiApiKey);
                     assertEquals("Salvo no projeto restaurado",VideoProject.load(file).script);
+                    var saved=VideoProject.load(file);assertEquals(4,saved.effects.size());assertEquals(2.5,saved.effects.get(1).start);assertEquals(.08,saved.effects.get(1).volume);
+                    session.invoke("removeEffect");session.invoke("saveProject");assertEquals(3,VideoProject.load(file).effects.size());
                 }
                 Files.delete(file);
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {

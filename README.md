@@ -64,12 +64,12 @@ Detalhes e decisões: [arquitetura](docs/arquitetura.md).
 
 1. Cole um roteiro curto, separando as cenas por uma linha em branco, e clique em **Criar cenas do roteiro**.
 2. Salve o projeto para definir onde os assets serão gravados.
-3. Informe a chave no campo oculto **OpenAI API key · salva no projeto**, ou inicie o editor com `OPENAI_API_KEY` configurada.
+3. Abra **Configurações** e informe a chave no campo oculto **OpenAI API key**, ou inicie o editor com `OPENAI_API_KEY` configurada.
 4. Clique em **Gerar imagens · até 3 cenas**. Os resultados vão diretamente para as cenas sem imagem, em ordem, e o manifesto é atualizado após cada resultado.
 
 O teste inicial permite até três cenas sem imagem por lote. Cenas que já têm imagem não são cobradas novamente por esse botão. O roteiro é separado localmente; o texto de cada cena e um trecho de contexto são enviados ao endpoint de imagens. Os padrões são `gpt-image-2`, `1536x864` (16:9), qualidade `low` e PNG. São configuráveis via `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE` e `OPENAI_IMAGE_QUALITY`; as combinações precisam ser suportadas pelo modelo escolhido. Contrato verificado na [API oficial de geração de imagens](https://developers.openai.com/api/reference/resources/images/methods/generate).
 
-A API usa a chave informada e pode gerar cobrança na conta correspondente. A chave informada no campo oculto do topo é salva em `metadata.openaiApiKey` no manifesto ao salvar o projeto ou anexar uma imagem gerada, e restaurada ao abrir o projeto. O manifesto contém a chave em texto simples: compartilhar o projeto também compartilha essa credencial. A variável de ambiente continua como alternativa quando o campo está vazio. Não há retentativas automáticas: se a API falhar, as cenas já prontas permanecem anexadas; clicar novamente solicita somente as pendentes. Cancelar interrompe o lote e conserva as imagens anexadas. Uma solicitação já enviada pode ter sido processada pela API antes do cancelamento.
+A API usa a chave informada e pode gerar cobrança na conta correspondente. A chave informada em Configurações é salva nas preferências locais. Ao salvar o projeto ou anexar uma imagem gerada, o valor ativo também é salvo em `metadata.openaiApiKey`. As configurações locais prevalecem; sem esse arquivo, o editor ainda restaura a chave de projetos antigos. O manifesto contém a chave em texto simples: compartilhar o projeto também compartilha essa credencial. A variável de ambiente continua como alternativa quando o campo está vazio. Não há retentativas automáticas: se a API falhar, as cenas já prontas permanecem anexadas; clicar novamente solicita somente as pendentes. Cancelar interrompe o lote e conserva as imagens anexadas. Uma solicitação já enviada pode ter sido processada pela API antes do cancelamento.
 
 A geração ocorre em segundo plano. Alterações estruturais ficam bloqueadas até o término ou cancelamento. PNGs recebidos em base64 são validados e gravados em `<projeto>.assets/generated/`; o salvamento normal incorpora os arquivos ao manifesto portátil.
 
@@ -122,3 +122,17 @@ python3 tools/sync_narration.py projects/meu-projeto/projeto.mvideo.json --apply
 ```
 
 O primeiro uso baixa o modelo multilingual `small`; o cache e o ambiente ficam em `.local-asr`, ignorado pelo Git. Sem `--apply`, somente o relatório é criado. Ao aplicar, o script preserva uma cópia do manifesto e altera apenas as durações das cenas. Ele rejeita áudios diferentes da transcrição ou com baixa correspondência ao roteiro, e verifica alterações concorrentes no manifesto. As trocas são posicionadas entre o fim da fala anterior e o início da próxima, arredondadas a 30 fps; a última cena cobre toda a narração. Timestamps de ASR são estimativas: revise as transições na prévia. Reabra o projeto no editor após executar os scripts.
+
+### Configurações e prompt base
+
+O botão **Configurações** abre uma janela com UI declarativa JSONC e scroll Megalodonte. Ela reúne a chave OpenAI oculta, a pasta da biblioteca de sons e o prompt base editável. **Salvar configurações** persiste esses valores em `editor-settings.json` no diretório de preferências do usuário; **Cancelar** não altera os valores salvos. A pasta deve existir e ser legível. No Linux, o arquivo de preferências é gravado com permissões 600. A chave não aparece mais na tela principal.
+
+A biblioteca inicia em `/home/eliezer/Desktop/backup/sounds`. O prompt padrão mantém o texto do Canal Dark de Curiosidades fornecido pelo usuário, acrescenta a pergunta de tema/duração e orienta a seleção de sons por cena. A versão completa para revisão está em [docs/prompts/gerar-video.md](docs/prompts/gerar-video.md); a cópia embarcada fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
+
+O agente de produção pode executar `python3 tools/generation_settings.py` para consultar a pasta e o prompt sem imprimir a chave. Os sons devem ser planejados por cena e anexados individualmente em `audio.effects`, preservando a narração e a música existente. O prompt e a biblioteca orientam o agente de produção; o botão de geração de imagens continua solicitando somente imagens, sem disparar produção automática de áudio.
+
+### Efeitos sonoros na timeline
+
+A faixa **TIMELINE · EFEITOS SONOROS** mostra cada arquivo na sua entrada em segundos, com duração e volume. **Adicionar som…** usa o seletor nativo e lembra a pasta de efeitos; na primeira importação parte da biblioteca configurada. Selecione um bloco, edite entrada, duração, volume, recorte inicial e fades e clique em **Aplicar efeito**. **Remover som** remove somente esse clipe. Salve o projeto para persistir as alterações.
+
+A prévia agenda os efeitos e seus fades; a exportação mistura os clipes com narração e música. Efeitos sobrepostos aparecem em linhas diferentes. A duração do vídeo continua sendo definida pelas imagens; sons são limitados ao fim do vídeo e do arquivo. As entradas são absolutas: depois de reorganizar ou alterar a duração das cenas, revise os tempos dos efeitos. Projetos antigos continuam compatíveis.

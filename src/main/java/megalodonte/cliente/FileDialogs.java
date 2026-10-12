@@ -15,6 +15,7 @@ final class FileDialogs {
         IMAGES("Importar imagens (ordenadas pelo nome)",false,true,"Imagens",null,"png","jpg","jpeg","gif"),
         IMAGE("Imagem da cena selecionada",false,false,"Imagens",null,"png","jpg","jpeg","gif"),
         NARRATION("Anexar narração",false,false,"Áudio",null,"mp3","wav","m4a","aac","flac","ogg"),
+        EFFECT("Adicionar efeito sonoro",false,false,"Áudio",null,"mp3","wav","m4a","aac","flac","ogg"),
         MUSIC("Adicionar música de fundo",false,false,"Áudio",null,"mp3","wav","m4a","aac","flac","ogg"),
         VIDEO("Exportar vídeo MP4 · YouTube 16:9",true,false,"Vídeo MP4","meu-video.mp4","mp4");
         final String title, description, filename; final boolean save, multiple; final String[] extensions;

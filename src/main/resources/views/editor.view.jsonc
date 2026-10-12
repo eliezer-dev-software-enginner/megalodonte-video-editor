@@ -94,6 +94,46 @@
     "openaiKey": {
       "type": "string",
       "initial": ""
+    },
+    "efeitosTimeline": {
+      "type": "string",
+      "initial": "[]"
+    },
+    "efeitoSelecionado": {
+      "type": "integer",
+      "initial": -1
+    },
+    "semEfeito": {
+      "type": "boolean",
+      "initial": true
+    },
+    "efeitoNome": {
+      "type": "string",
+      "initial": "Selecione um som"
+    },
+    "efeitoInicio": {
+      "type": "string",
+      "initial": "0"
+    },
+    "efeitoRecorte": {
+      "type": "string",
+      "initial": "0"
+    },
+    "efeitoDuracao": {
+      "type": "string",
+      "initial": "3"
+    },
+    "efeitoVolume": {
+      "type": "string",
+      "initial": "15"
+    },
+    "efeitoFadeIn": {
+      "type": "string",
+      "initial": "0.1"
+    },
+    "efeitoFadeOut": {
+      "type": "string",
+      "initial": "0.2"
     }
   },
   "view": {
@@ -169,32 +209,16 @@
                 "bind": {
                   "disabled": "exportando"
                 }
-              }
-            ]
-          },
-          {
-            "type": "Row",
-            "props": {
-              "spacing": 12,
-              "fillWidth": true
-            },
-            "children": [
-              {
-                "type": "Text",
-                "props": {
-                  "text": "OpenAI API key · salva no projeto"
-                }
               },
               {
-                "type": "PasswordInput",
-                "id": "openaiKeyInput",
+                "type": "Button",
+                "id": "settingsButton",
                 "props": {
-                  "height": 36,
-                  "placeholder": "Cole sua chave da OpenAI"
+                  "text": "Configurações",
+                  "height": 36
                 },
-                "bind": {
-                  "value": "openaiKey",
-                  "disabled": "gerandoImagens"
+                "events": {
+                  "onClick": "openSettings"
                 }
               }
             ]
@@ -391,6 +415,263 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "text": "TIMELINE · EFEITOS SONOROS"
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "addEffectButton",
+                    "props": {
+                      "text": "Adicionar som…",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "addEffect"
+                    },
+                    "bind": {
+                      "disabled": "semCenas"
+                    }
+                  },
+                  {
+                    "type": "SoundSequence",
+                    "id": "effectsTimeline",
+                    "props": {
+                      "height": 170
+                    },
+                    "bind": {
+                      "items": "efeitosTimeline",
+                      "selected": "efeitoSelecionado"
+                    },
+                    "events": {
+                      "onSelect": "selectEffect"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 480
+                    },
+                    "bind": {
+                      "text": "efeitoNome"
+                    }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 8
+                    },
+                    "children": [
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Entrada (s)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoInicioInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoInicio",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Duração (s)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoDuracaoInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoDuracao",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Volume (%)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoVolumeInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoVolume",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 8
+                    },
+                    "children": [
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Recorte inicial (s)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoRecorteInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoRecorte",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Fade in (s)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoFadeInInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoFadeIn",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Column",
+                        "props": {
+                          "spacing": 4
+                        },
+                        "children": [
+                          {
+                            "type": "Text",
+                            "props": {
+                              "text": "Fade out (s)"
+                            }
+                          },
+                          {
+                            "type": "Input",
+                            "id": "efeitoFadeOutInput",
+                            "props": {
+                              "width": 115,
+                              "height": 34
+                            },
+                            "bind": {
+                              "value": "efeitoFadeOut",
+                              "disabled": "semEfeito"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 8
+                    },
+                    "children": [
+                      {
+                        "type": "Button",
+                        "id": "applyEffectButton",
+                        "props": {
+                          "text": "Aplicar efeito",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "applyEffect"
+                        },
+                        "bind": {
+                          "disabled": "semEfeito"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "removeEffectButton",
+                        "props": {
+                          "text": "Remover som",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "removeEffect"
+                        },
+                        "bind": {
+                          "disabled": "semEfeito"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "text": "Entradas em segundos do vídeo. Ao reorganizar as cenas, revise os tempos dos sons."
+                    }
                   },
                   {
                     "type": "Row",

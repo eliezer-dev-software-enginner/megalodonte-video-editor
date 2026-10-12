@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "id": "editorSettings",
+  "states": {
+    "apiKey": {
+      "type": "string",
+      "initial": ""
+    },
+    "soundsDirectory": {
+      "type": "string",
+      "initial": ""
+    },
+    "basePrompt": {
+      "type": "string",
+      "initial": ""
+    },
+    "mensagem": {
+      "type": "string",
+      "initial": ""
+    }
+  },
+  "view": {
+    "type": "Column",
+    "props": {
+      "padding": 24,
+      "spacing": 14,
+      "fillWidth": true,
+      "fillHeight": true
+    },
+    "children": [
+      {
+        "type": "Text",
+        "style": {
+          "fontSize": 24
+        },
+        "props": {
+          "text": "Configurações"
+        }
+      },
+      {
+        "type": "Scroll",
+        "id": "settingsScroll",
+        "props": {
+          "fillWidth": true,
+          "fillHeight": true
+        },
+        "children": [
+          {
+            "type": "Column",
+            "props": {
+              "spacing": 12
+            },
+            "children": [
+              {
+                "type": "Text",
+                "props": {
+                  "text": "OpenAI API key"
+                }
+              },
+              {
+                "type": "PasswordInput",
+                "id": "settingsApiKey",
+                "props": {
+                  "placeholder": "Sua chave da OpenAI",
+                  "height": 36,
+                  "width": 650
+                },
+                "bind": {
+                  "value": "apiKey"
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "A chave é salva nas configurações locais e nos metadados ao salvar o projeto.",
+                  "wrapWidth": 640
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "Biblioteca de sons"
+                }
+              },
+              {
+                "type": "Input",
+                "id": "soundsDirectoryInput",
+                "props": {
+                  "height": 36,
+                  "width": 650,
+                  "placeholder": "Diretório de sons e efeitos"
+                },
+                "bind": {
+                  "value": "soundsDirectory"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "chooseSoundsButton",
+                "props": {
+                  "text": "Selecionar pasta…",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "chooseSounds"
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
+                  "wrapWidth": 640
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "Prompt base da geração de vídeo"
+                }
+              },
+              {
+                "type": "TextArea",
+                "id": "basePromptInput",
+                "props": {
+                  "height": 260,
+                  "width": 650,
+                  "placeholder": "Instruções para o agente de IA"
+                },
+                "bind": {
+                  "value": "basePrompt"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "resetPromptButton",
+                "props": {
+                  "text": "Restaurar prompt padrão",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "resetPrompt"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Text",
+        "id": "settingsMessage",
+        "props": {
+          "wrapWidth": 650
+        },
+        "bind": {
+          "text": "mensagem"
+        }
+      },
+      {
+        "type": "Row",
+        "props": {
+          "spacing": 12
+        },
+        "children": [
+          {
+            "type": "Button",
+            "id": "saveSettingsButton",
+            "props": {
+              "text": "Salvar configurações",
+              "height": 36
+            },
+            "events": {
+              "onClick": "saveSettings"
+            }
+          },
+          {
+            "type": "Button",
+            "id": "cancelSettingsButton",
+            "props": {
+              "text": "Cancelar",
+              "height": 36
+            },
+            "events": {
+              "onClick": "cancelSettings"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

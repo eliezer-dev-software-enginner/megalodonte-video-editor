@@ -18,6 +18,17 @@ class VideoProjectTest {
         assertEquals("", VideoProject.load(file).openaiApiKey);
         assertFalse(VideoProject.load(file).animateImages);
     }
+    @Test void effectsArePortableIndependentAndValidated() throws Exception {
+        var p=VideoProject.fromScript("Cena");var sound=directory.resolve("effect.wav");Files.write(sound,new byte[]{1,2,3});
+        var effect=new VideoProject.SoundEffect();effect.file=sound.toString();effect.start=1;effect.offset=2;effect.duration=2;effect.volume=.2;effect.fadeIn=.4;effect.fadeOut=.5;p.effects.add(effect);
+        var copy=p.snapshot();copy.effects.getFirst().start=3;assertEquals(1,effect.start);
+        var file=directory.resolve("effects.json");p.save(file);Files.delete(sound);
+        var restored=VideoProject.load(file).effects.getFirst();assertEquals(2,restored.offset);assertEquals(.2,restored.volume);assertEquals(.4,restored.fadeIn);assertTrue(Files.isRegularFile(Path.of(restored.file)));
+        assertFalse(effect.active(.9));assertTrue(effect.active(1));assertFalse(effect.active(3));assertEquals(.1,effect.gain(1.2),.0001);assertEquals(.1,effect.gain(2.75),.0001);
+        effect.start=Double.NaN;assertThrows(IllegalArgumentException.class,effect::validate);
+        effect.start=0;effect.fadeOut=5;assertThrows(IllegalArgumentException.class,effect::validate);
+        assertThrows(java.io.IOException.class,()->FileSelections.protectAssets(VideoProject.load(file),Path.of(restored.file),file,true));
+    }
     @Test void paragraphsPreserveOrderAndDurations() {
         var project = VideoProject.fromScript("Primeira linha\ncontinuação\n\nSegunda cena\r\n\r\nTerceira");
         assertEquals(3, project.clips.size()); assertEquals("Primeira linha\ncontinuação", project.clips.getFirst().text);

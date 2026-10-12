@@ -41,6 +41,7 @@ final class FileDialogFolders {
         return switch(kind) {
             case IMAGE,IMAGES -> "images";
             case NARRATION -> "narration";
+            case EFFECT -> "effects";
             case MUSIC -> "music";
             case PROJECT_OPEN,PROJECT_SAVE -> "projects";
             case VIDEO -> "video";
