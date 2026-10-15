@@ -142,16 +142,21 @@ class EditorViewTest {
             });
             Platform.runLater(playbackCheck); playbackCheck.get(10,TimeUnit.SECONDS).get(10,TimeUnit.SECONDS);
             var restoreCheck=new FutureTask<Void>(() -> {
-                var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07; stored.openaiApiKey="dummy-restored-key";
+                var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07;
                 Path sound=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"cue.wav");
                 Files.write(sound,new byte[]{1,2,3});
                 for(int i=0;i<4;i++) {var effect=new VideoProject.SoundEffect();effect.file=sound.toString();effect.start=1;stored.effects.add(effect);}
                 Path file=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"restaurado.json"); stored.save(file);
+                var legacy=com.google.gson.JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+                var metadata=new com.google.gson.JsonObject();metadata.addProperty("openaiApiKey","dummy-restored-key");legacy.add("metadata",metadata);
+                Files.writeString(file,legacy.toString());
                 new LastProjectStore().remember(file);
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     app.render(); app.onMount(); var session=app.current();
                     assertEquals(stored.script,session.states().get("roteiro"));
-                    assertEquals(stored.openaiApiKey,session.states().get("openaiKey"));
+                    assertEquals("dummy-restored-key",session.states().get("openaiKey"));
+                    assertEquals("dummy-restored-key",new EditorSettings().load().apiKey);
+                    assertFalse(Files.readString(file).contains("openaiApiKey"));
                     assertEquals(7,Double.parseDouble(session.states().string("volumeMusica").get()),.0001);
                     assertTrue(session.states().string("resumo").get().startsWith("2 cenas"));
                     assertTrue(session.states().string("mensagem").get().contains("restaurado"));
@@ -162,8 +167,8 @@ class EditorViewTest {
                     session.states().set("efeitoInicio","2.5");session.states().set("efeitoDuracao","1.5");session.states().set("efeitoVolume","8");session.invoke("applyEffect");
                     session.states().set("efeitoInicio","NaN");session.invoke("applyEffect");assertTrue(session.states().string("mensagem").get().contains("Não foi possível"));
                     session.invoke("selectEffect");assertEquals("2.5",session.states().get("efeitoInicio"));
-                    session.states().set("roteiro","Salvo no projeto restaurado"); session.states().set("openaiKey","dummy-updated-key"); session.invoke("saveProject");
-                    assertEquals("dummy-updated-key",VideoProject.load(file).openaiApiKey);
+                    session.states().set("roteiro","Salvo no projeto restaurado"); session.invoke("saveProject");
+                    assertFalse(Files.readString(file).contains("openaiApiKey"));
                     assertEquals("Salvo no projeto restaurado",VideoProject.load(file).script);
                     var saved=VideoProject.load(file);assertEquals(4,saved.effects.size());assertEquals(2.5,saved.effects.get(1).start);assertEquals(.08,saved.effects.get(1).volume);
                     session.invoke("removeEffect");session.invoke("saveProject");assertEquals(3,VideoProject.load(file).effects.size());

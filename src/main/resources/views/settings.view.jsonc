@@ -72,7 +72,7 @@
               {
                 "type": "Text",
                 "props": {
-                  "text": "A chave é salva nas configurações locais e nos metadados ao salvar o projeto.",
+                  "text": "A chave é salva somente nas configurações locais deste aplicativo.",
                   "wrapWidth": 640
                 }
               },

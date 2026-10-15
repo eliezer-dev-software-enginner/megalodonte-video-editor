@@ -21,4 +21,12 @@ class EditorSettingsTest {
         Path file=folder.resolve("settings.json");Files.writeString(file,"{dummy-secret");
         var error=assertThrows(java.io.IOException.class,()->new EditorSettings(file).load());assertFalse(error.getMessage().contains("dummy-secret"));
     }
+    @Test void legacyKeyMigrationStaysLocalAndPreservesOtherSettings() throws Exception {
+        Path file=folder.resolve("settings.json");var store=new EditorSettings(file);
+        store.saveApiKey("dummy-legacy-key");
+        var values=store.load();assertEquals("dummy-legacy-key",values.apiKey);
+        assertEquals(EditorSettings.DEFAULT_SOUNDS,values.soundsDirectory);
+        assertTrue(values.basePrompt.contains("DIREÇÃO SONORA"));
+        if(Files.getFileStore(file).supportsFileAttributeView("posix")) assertEquals("rw-------",java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)));
+    }
 }

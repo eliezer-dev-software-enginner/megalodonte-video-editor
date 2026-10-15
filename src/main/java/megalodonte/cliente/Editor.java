@@ -18,7 +18,7 @@ public final class Editor extends ViewScript {
         pausePlayback();
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
         settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,settings.basePrompt),values -> {
-            settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);project.openaiApiKey=values.apiKey;
+            settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             message("Configurações salvas. Prompt base e biblioteca de sons disponíveis para a geração de vídeo.");
         });
         settingsWindow.show();
@@ -37,7 +37,7 @@ public final class Editor extends ViewScript {
         try { ImageGenerationJob.pending(project); client=OpenAiImageClient.fromSessionKey(text("openaiKey")); }
         catch(Exception e) { message(e.getMessage()); return; }
         if(projectFile==null) { message("Salve o projeto antes de gerar imagens para guardar os PNGs junto aos assets."); return; }
-        pausePlayback(); project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip();
+        pausePlayback(); project.script=text("roteiro");
         var snapshot=project.snapshot(); var targetProject=project;
         var job=new ImageGenerationJob(client); imageJob=job;set("gerandoImagens",true);set("iaStatus","Preparando imagens…");
         Path assets=projectFile.getParent().resolve(projectFile.getFileName()+".assets").resolve("generated");
@@ -229,7 +229,7 @@ public final class Editor extends ViewScript {
     }
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
-        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.openaiApiKey=text("openaiKey").strip(); project.animateImages=previous.animateImages;
+        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.animateImages=previous.animateImages;
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
         project.music.file=previous.music.file; project.music.volume=previous.music.volume;project.effects.addAll(previous.effects);audio.load(project,this::audioError); set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
         message("Cenas criadas localmente, uma por parágrafo. Importe as imagens na ordem desejada.");
@@ -302,7 +302,7 @@ public final class Editor extends ViewScript {
         }
         try {
             FileSelections.protectAssets(project,target,projectFile,false);
-            project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip(); project.save(target,projectFile==null ? null : projectRevision); projectFile=target;projectRevision=VideoProject.revision(target);
+            project.script=text("roteiro"); project.save(target,projectFile==null ? null : projectRevision); projectFile=target;projectRevision=VideoProject.revision(target);
         } catch(Exception e) { message("Não foi possível salvar: " + e.getMessage()); return; }
         try { lastProject.remember(projectFile); message("Projeto salvo: " + projectFile); }
         catch(Exception e) { message("Projeto salvo: " + projectFile + ". Não foi possível guardar o caminho para a próxima inicialização: " + e.getMessage()); }
@@ -316,9 +316,14 @@ public final class Editor extends ViewScript {
         } catch (Exception e) { message("Não foi possível abrir: " + e.getMessage()); }
     }
     private void applyProject(VideoProject loaded,Path file) throws java.io.IOException {
-        timelineChanged(); project=loaded; projectFile=file.toAbsolutePath().normalize();
-        projectRevision=VideoProject.revision(projectFile);
-        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settingsLoaded ? settings.apiKey : project.openaiApiKey);
+        Path absolute=file.toAbsolutePath().normalize();String revision=VideoProject.revision(absolute);
+        String legacyKey=VideoProject.legacyApiKey(absolute);
+        if(!legacyKey.isBlank() && settings.apiKey.isBlank()) {
+            settingsStore.saveApiKey(legacyKey);settings=settingsStore.load();settingsLoaded=true;
+        }
+        if(VideoProject.removeLegacyApiKey(absolute,revision)) revision=VideoProject.revision(absolute);
+        timelineChanged(); project=loaded; projectFile=absolute;projectRevision=revision;
+        refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settings.apiKey);
         set("efeitoSelecionado",project.effects.isEmpty() ? -1 : 0);set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }
     private String missingAssetsMessage() {

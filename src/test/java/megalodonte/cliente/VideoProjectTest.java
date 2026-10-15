@@ -5,17 +5,20 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
-    @Test void projectRestoresApiKeyAndSupportsLegacyMetadata() throws Exception {
-        var project = VideoProject.fromScript("Cena"); project.openaiApiKey = "dummy-project-key"; project.animateImages = true;
-        assertEquals(project.openaiApiKey, project.snapshot().openaiApiKey);
+    @Test void projectNeverSavesApiKeyAndCanSanitizeLegacyMetadata() throws Exception {
+        var project = VideoProject.fromScript("Cena"); project.animateImages = true;
         assertTrue(project.snapshot().animateImages);
         var file = directory.resolve("key.mvideo.json"); project.save(file);
-        assertEquals("dummy-project-key", VideoProject.load(file).openaiApiKey);
+        assertFalse(Files.readString(file).contains("openaiApiKey"));
         assertTrue(VideoProject.load(file).animateImages);
-        project.openaiApiKey = ""; project.save(file);
-        assertEquals("", VideoProject.load(file).openaiApiKey);
-        Files.writeString(file, "{\"version\":1,\"script\":\"\",\"clips\":[]}");
-        assertEquals("", VideoProject.load(file).openaiApiKey);
+        Files.writeString(file, "{\"version\":1,\"script\":\"\",\"clips\":[],\"metadata\":{\"openaiApiKey\":\"dummy-project-key\",\"other\":\"keep\"}}");
+        String revision=VideoProject.revision(file);
+        assertEquals("dummy-project-key",VideoProject.legacyApiKey(file));
+        assertTrue(VideoProject.removeLegacyApiKey(file,revision));
+        assertFalse(Files.readString(file).contains("dummy-project-key"));
+        assertFalse(Files.readString(file).contains("openaiApiKey"));
+        assertTrue(Files.readString(file).contains("\"other\": \"keep\""));
+        assertThrows(java.io.IOException.class,()->VideoProject.removeLegacyApiKey(file,revision));
         assertFalse(VideoProject.load(file).animateImages);
     }
     @Test void effectsArePortableIndependentAndValidated() throws Exception {

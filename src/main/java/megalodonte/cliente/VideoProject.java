@@ -55,7 +55,7 @@ public final class VideoProject {
         return percent / 100;
     }
     public VideoProject snapshot() {
-        var copy = new VideoProject(); copy.script = script; copy.openaiApiKey = openaiApiKey; copy.animateImages = animateImages;
+        var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
         for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
@@ -64,7 +64,6 @@ public final class VideoProject {
     }
     public static final String ASPECT_RATIO = "16:9";
     public String script = "";
-    public String openaiApiKey = "";
     public boolean animateImages;
     public final List<Clip> clips = new ArrayList<>();
     public static VideoProject fromScript(String script) {
@@ -98,7 +97,6 @@ public final class VideoProject {
             validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
-        var metadata = new JsonObject(); metadata.addProperty("openaiApiKey", openaiApiKey); root.add("metadata", metadata);
         var audio = new JsonObject();
         audio.add("narration", audioJson(narration,absolute,assets));
         audio.add("music", audioJson(music,absolute,assets));
@@ -131,10 +129,6 @@ public final class VideoProject {
             if (root.has("aspectRatio") && !ASPECT_RATIO.equals(root.get("aspectRatio").getAsString())) throw new IllegalArgumentException("Somente vídeos horizontais 16:9 são suportados");
             var project = new VideoProject(); project.script = root.get("script").getAsString();
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
-            if (root.has("metadata")) {
-                var metadata = root.getAsJsonObject("metadata");
-                if (metadata.has("openaiApiKey") && !metadata.get("openaiApiKey").isJsonNull()) project.openaiApiKey = metadata.get("openaiApiKey").getAsString();
-            }
             for (var element : root.getAsJsonArray("clips")) {
                 var scene = element.getAsJsonObject(); var clip = new Clip(scene.get("text").getAsString());
                 clip.duration = scene.get("duration").getAsDouble();
@@ -157,6 +151,36 @@ public final class VideoProject {
             }
             return project;
         } catch (RuntimeException e) { throw new IOException("Projeto inválido: " + e.getMessage(), e); }
+    }
+    /** Reads a credential from an old manifest only for one-time migration to local settings. */
+    static String legacyApiKey(Path file) throws IOException {
+        try {
+            var root=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            if(!root.has("metadata") || !root.get("metadata").isJsonObject()) return "";
+            var metadata=root.getAsJsonObject("metadata");
+            return metadata.has("openaiApiKey") && !metadata.get("openaiApiKey").isJsonNull()
+                ? metadata.get("openaiApiKey").getAsString() : "";
+        } catch(RuntimeException e) { throw new IOException("Metadados antigos inválidos.",e); }
+    }
+    /** Removes only the legacy credential, preserving scenes, paths and other metadata. */
+    static boolean removeLegacyApiKey(Path file,String expectedRevision) throws IOException {
+        requireRevision(file,expectedRevision);
+        final JsonObject root;
+        try { root=JsonParser.parseString(Files.readString(file)).getAsJsonObject(); }
+        catch(RuntimeException e) { throw new IOException("Projeto inválido durante a migração.",e); }
+        if(!root.has("metadata") || !root.get("metadata").isJsonObject()) return false;
+        var metadata=root.getAsJsonObject("metadata");
+        if(!metadata.has("openaiApiKey")) return false;
+        metadata.remove("openaiApiKey");
+        if(metadata.isEmpty()) root.remove("metadata");
+        Path temporary=Files.createTempFile(file.toAbsolutePath().getParent(),".project-sanitize-",".tmp");
+        try {
+            Files.writeString(temporary,new GsonBuilder().setPrettyPrinting().create().toJson(root)+"\n");
+            requireRevision(file,expectedRevision);
+            try { Files.move(temporary,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+            catch(AtomicMoveNotSupportedException e) { Files.move(temporary,file,StandardCopyOption.REPLACE_EXISTING); }
+            return true;
+        } finally { Files.deleteIfExists(temporary); }
     }
     private static String copyAsset(String sourceName, Path manifest, Path assets) throws IOException {
         if (sourceName.isBlank()) return "";

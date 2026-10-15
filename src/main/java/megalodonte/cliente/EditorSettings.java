@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 
-/** Shared editor preferences; project credentials remain supported for compatibility. */
+/** Shared local editor preferences; credentials are never written to project manifests. */
 final class EditorSettings {
     static final String DEFAULT_SOUNDS = "/home/eliezer/Desktop/backup/sounds";
     static final class Values {
@@ -36,9 +36,16 @@ final class EditorSettings {
     void save(Values values) throws IOException {
         Path directory=validateSounds(values.soundsDirectory);
         if(values.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
+        write(new Values(values.apiKey,directory.toString(),values.basePrompt));
+    }
+    /** Migrate a legacy project key without requiring its old sound folder to exist. */
+    void saveApiKey(String apiKey) throws IOException {
+        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt));
+    }
+    private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
         var json=new JsonObject(); json.addProperty("openaiApiKey",values.apiKey.strip());
-        json.addProperty("soundsDirectory",directory.toString()); json.addProperty("basePrompt",values.basePrompt);
+        json.addProperty("soundsDirectory",values.soundsDirectory); json.addProperty("basePrompt",values.basePrompt);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
