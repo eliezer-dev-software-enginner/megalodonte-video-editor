@@ -2,6 +2,7 @@ package megalodonte.cliente;
 import megalodonte.script.ViewScript;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import megalodonte.components.ImagePreview;
 import java.nio.file.*;
 import java.util.*;
 public final class Editor extends ViewScript {
@@ -201,7 +202,13 @@ public final class Editor extends ViewScript {
             if (playhead < start) break;
         }
         if (active != index()) { set("selecionada",active); refreshSelection(); }
+        refreshVisualPreview();
         set("tempo", String.format(Locale.ROOT,"%.1fs / %.1fs",playhead,project.duration()));
+    }
+    private void refreshVisualPreview() {
+        int selected=index();var clip=selected();if(clip==null)return;
+        double start=0;for(int i=0;i<selected;i++)start+=project.clips.get(i).duration;
+        ((ImagePreview)component("preview")).setVisualEffect(clip.visualEffect,selected,playhead-start);
     }
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
@@ -240,8 +247,10 @@ public final class Editor extends ViewScript {
     }
     private void refreshSelection() {
         var clip = selected(); set("semSelecao", clip == null); set("imagem", clip == null ? "" : clip.image);
-        set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
+        set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + (clip.visualEffect.isBlank() ? "" : clip.visualEffect.equals("shake") ? " · ✦ Tremor leve" : " · ✦ Partículas") + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
         set("duracao", clip == null ? "5" : Double.toString(clip.duration));
+        if(clip!=null)refreshVisualPreview();
+        else ((ImagePreview)component("preview")).setVisualEffect("",0,0);
     }
     public void applyDuration() { if(generationBusy()) return;
         var clip = selected(); if (clip == null) return;

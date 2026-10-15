@@ -34,6 +34,13 @@ class VideoProjectTest {
         assertEquals(3, project.clips.size()); assertEquals("Primeira linha\ncontinuação", project.clips.getFirst().text);
         assertEquals(15, project.duration()); assertEquals(0, VideoProject.fromScript(" \n ").clips.size());
     }
+    @Test void visualParticleCueSurvivesSaveAndSnapshot() throws Exception {
+        var project=VideoProject.fromScript("Abertura");project.clips.getFirst().visualEffect="particles";
+        assertEquals("particles",project.snapshot().clips.getFirst().visualEffect);
+        var file=directory.resolve("visual.json");project.save(file);
+        assertEquals("particles",VideoProject.load(file).clips.getFirst().visualEffect);
+        assertThrows(IllegalArgumentException.class,()->VideoProject.validateVisualEffect("snow"));
+    }
     @Test void savedProjectCarriesAssetsAndSurvivesRemovalOfOriginal() throws Exception {
         var image = directory.resolve("original.png"); Files.write(image, new byte[]{1,2,3});
         var project = VideoProject.fromScript("Cena um\n\nCena dois"); project.clips.getFirst().image = image.toString(); project.clips.getFirst().duration = 7.5;

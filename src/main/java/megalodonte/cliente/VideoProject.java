@@ -10,6 +10,7 @@ public final class VideoProject {
     public static final class Clip {
         public String text;
         public String image = "";
+        public String visualEffect = "";
         public double duration = 5;
         public Clip(String text) { this.text = text; }
     }
@@ -57,7 +58,7 @@ public final class VideoProject {
         var copy = new VideoProject(); copy.script = script; copy.openaiApiKey = openaiApiKey; copy.animateImages = animateImages;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
-        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; copy.clips.add(next); }
+        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
         for(var effect:effects) copy.effects.add(effect.copy());
         return copy;
     }
@@ -75,8 +76,8 @@ public final class VideoProject {
     public String timeline() {
         var items = new JsonArray();
         for (Clip clip : clips) {
-            var item = new JsonObject(); item.addProperty("label", clip.text.length() > 70 ? clip.text.substring(0,70) + "…" : clip.text);
-            item.addProperty("source", clip.image); item.addProperty("duration", clip.duration); items.add(item);
+            var item = new JsonObject(); item.addProperty("label", (clip.visualEffect.isBlank() ? "" : "✦ ")+(clip.text.length() > 70 ? clip.text.substring(0,70) + "…" : clip.text));
+            item.addProperty("source", clip.image); item.addProperty("duration", clip.duration); item.addProperty("visualEffect",clip.visualEffect); items.add(item);
         }
         return items.toString();
     }
@@ -89,6 +90,7 @@ public final class VideoProject {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
             String image = copyAsset(clip.image, absolute, assets);
             scene.addProperty("image", image); scenes.add(scene);
+            validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
         var metadata = new JsonObject(); metadata.addProperty("openaiApiKey", openaiApiKey); root.add("metadata", metadata);
@@ -122,6 +124,8 @@ public final class VideoProject {
                 if (!Double.isFinite(clip.duration) || clip.duration < .1 || clip.duration > 3600) throw new IllegalArgumentException("Duração inválida");
                 String image = scene.get("image").getAsString();
                 clip.image = resolveAsset(image,file);
+                clip.visualEffect=scene.has("visualEffect") ? scene.get("visualEffect").getAsString() : "";
+                validateVisualEffect(clip.visualEffect);
                 project.clips.add(clip);
             }
             if (root.has("audio")) {
@@ -155,6 +159,9 @@ public final class VideoProject {
     }
     private static void validateVolume(double volume) {
         if (!Double.isFinite(volume) || volume < 0 || volume > 1) throw new IllegalArgumentException("Volume inválido");
+    }
+    static void validateVisualEffect(String effect) {
+        if(!effect.isBlank() && !effect.equals("particles") && !effect.equals("shake")) throw new IllegalArgumentException("Efeito visual desconhecido: "+effect);
     }
     private static String resolveAsset(String name, Path manifest) {
         if (name.isBlank()) return "";

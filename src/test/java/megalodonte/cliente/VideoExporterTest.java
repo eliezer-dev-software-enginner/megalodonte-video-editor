@@ -62,6 +62,25 @@ class VideoExporterTest {
         assertFrameColor(file,0,Color.BLACK); assertFrameColor(file,.5,Color.RED);
         assertEquals("",textCommand("ffprobe","-v","error","-select_streams","a","-show_entries","stream=codec_name","-of","csv=p=0",file.toString()).strip());
     }
+    @Test void particleCueRendersMovingLights() throws Exception {
+        var project=VideoProject.fromScript("Abertura");var clip=project.clips.getFirst();
+        clip.image=image("dark.png",Color.BLACK).toString();clip.duration=1;clip.visualEffect="particles";
+        var file=directory.resolve("particles.mp4");new VideoExporter(320,180).export(project,file,message->{});
+        assertTrue(Files.size(file)>0);
+        var first=binaryCommand("ffmpeg","-v","error","-ss","0.1","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        var later=binaryCommand("ffmpeg","-v","error","-ss","0.8","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        assertFalse(Arrays.equals(first,later),"Particles should move over time");
+    }
+    @Test void shakeCueMovesImageSlightly() throws Exception {
+        var striped=new BufferedImage(320,180,BufferedImage.TYPE_INT_RGB);
+        for(int y=0;y<180;y++)for(int x=0;x<320;x++)striped.setRGB(x,y,((x/8+y/8)%2==0 ? Color.WHITE : Color.BLACK).getRGB());
+        var source=directory.resolve("striped.png");ImageIO.write(striped,"png",source.toFile());
+        var project=VideoProject.fromScript("Impacto");var clip=project.clips.getFirst();clip.image=source.toString();clip.duration=1;clip.visualEffect="shake";
+        var file=directory.resolve("shake.mp4");new VideoExporter(320,180).export(project,file,message->{});
+        var first=binaryCommand("ffmpeg","-v","error","-ss","0.1","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        var later=binaryCommand("ffmpeg","-v","error","-ss","0.8","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        assertFalse(Arrays.equals(first,later));
+    }
     @Test void cancellationAndMissingAssetsPreserveExistingOutput() throws Exception {
         var output=directory.resolve("existing.mp4"); Files.writeString(output,"original");
         var project=VideoProject.fromScript("Cena");

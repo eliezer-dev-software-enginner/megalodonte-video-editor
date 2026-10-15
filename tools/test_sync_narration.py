@@ -16,6 +16,15 @@ class AlignmentTest(unittest.TestCase):
         self.assertLess(result['timelineDuration']-5.019, 1/30)
         self.assertAlmostEqual(result['timelineDuration'], sum(s['duration'] for s in result['scenes']))
 
+    def test_short_improvised_lead_in_keeps_reliable_scene_anchor(self):
+        clips=[{'text':'Fim anterior seguro.'},
+               {'text':'E aqui entra uma parte importante dessa iniciativa para começar um projeto menor com etapas claras e decisões práticas para testar publicar aprender com uso real ao longo do tempo.'}]
+        spoken=['Fim','anterior','seguro','que','entre','uma','parte','importante','nessa','iniciativa','para','começar','um','projeto','menor','com','etapas','claras','e','decisões','práticas','para','testar','publicar','aprender','com','uso','real','ao','longo','do','tempo']
+        words=[dict(text=word,start=.4*i,end=.4*i+.3) for i,word in enumerate(spoken)]
+        result=align(clips,words,15.0)
+        self.assertGreater(result['coverage'],.75)
+        self.assertLess(result['scenes'][1]['start'],words[5]['start'])
+
     def test_unrelated_narration_is_rejected(self):
         with self.assertRaises(ValueError):
             align([{'text': 'O Google anunciou um acordo nuclear.'}],

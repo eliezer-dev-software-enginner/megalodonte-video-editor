@@ -44,11 +44,14 @@ def align(clips, words, audio_duration, fps=30):
         pairs = [(j, mapping[j]) for j in range(start, end) if j in mapping]
         ratio = len(pairs) / max(1, end - start)
         anchors = [(j, mapping[j]) for j in range(start, min(end, start + 8)) if j in mapping]
-        if ratio < .65 or len(anchors) < min(3, end - start) or anchors[0][0] > start + 1:
+        if ratio < .65 or len(anchors) < min(3, end - start) or (anchors[0][0] > start + 1 and (ratio < .85 or anchors[0][0] > start + 4)):
             raise ValueError(f'Cena {i+1}: correspondência insuficiente; revisar antes de salvar.')
         first = anchors[0][1]
-        if anchors[0][0] == start + 1 and first > 0:
-            first -= 1
+        # A short improvised lead-in may replace the first few words of a scene.
+        # Backfill at most two heard words only when the rest matches strongly.
+        leading = anchors[0][0] - start
+        if leading and first > 0 and (leading == 1 or ratio >= .85):
+            first -= min(leading, 2)
         scenes.append({'scene': i+1, 'text': clips[i]['text'], 'coverage': ratio,
                        'speechStart': times[first][0], 'speechEnd': times[pairs[-1][1]][1]})
     boundaries = [0]

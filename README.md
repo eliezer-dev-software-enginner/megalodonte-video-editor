@@ -109,6 +109,8 @@ Os testes normais usam um servidor HTTP local com PNGs de teste e não consomem 
 
 O manifesto aceita `animateImages: true` para aplicar aproximação central suave e fades curtos em cada cena. A opção é preservada ao salvar e ao recriar as cenas; projetos antigos usam imagens estáticas por padrão. A duração continua definida na timeline.
 
+Para uma ênfase pontual, `visualEffect: "shake"` aplica um tremor leve à cena na prévia e na exportação; `visualEffect: "particles"` mostra pontos luminosos flutuantes. O campo fica fora da narração e é opcional. O prompt base orienta o agente a usar `animateImages: true` para os fades e reservar `shake` para poucas cenas em que o movimento faça sentido.
+
 ### Sincronizar cenas com narração local
 
 Os scripts em `tools/` usam faster-whisper no próprio computador para obter tempos de palavras e comparar a fala com o texto de cada cena. O áudio não é enviado para uma API. Instale uma vez em um ambiente isolado:
@@ -130,6 +132,8 @@ O botão **Configurações** abre uma janela com UI declarativa JSONC e scroll M
 A biblioteca inicia em `/home/eliezer/Desktop/backup/sounds`. O prompt padrão mantém o texto do Canal Dark de Curiosidades fornecido pelo usuário, acrescenta a pergunta de tema/duração e orienta a seleção de sons por cena. A versão completa para revisão está em [docs/prompts/gerar-video.md](docs/prompts/gerar-video.md); a cópia embarcada fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
 
 O agente de produção pode executar `python3 tools/generation_settings.py` para consultar a pasta e o prompt sem imprimir a chave. Os sons devem ser planejados por cena e anexados individualmente em `audio.effects`, preservando a narração e a música existente. O prompt e a biblioteca orientam o agente de produção; o botão de geração de imagens continua solicitando somente imagens, sem disparar produção automática de áudio.
+
+Para continuar um projeto com regras próprias, passe `--project projects/<pasta>/<arquivo>.mvideo.json`. Quando existir `prompt-base.md` ao lado do manifesto, esse prompt substitui o global na saída do comando; a biblioteca de sons continua vindo das Configurações. Os projetos Google/energia nuclear e vídeo 1 do aplicativo de ponto têm prompts próprios com fades (`animateImages: true`) e uso pontual de `shake`.
 
 ### Efeitos sonoros na timeline
 

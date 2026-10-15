@@ -28,7 +28,7 @@ class EditorViewTest {
                     .filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
                 var settingsRoot=settingsStage.getScene().getRoot(); settingsRoot.applyCss();settingsRoot.layout();
                 var keyField=(PasswordField)settingsRoot.lookup(".password-field");
-                var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField && !(n instanceof PasswordField)).map(n->(TextField)n).findFirst().orElseThrow();
+                var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Diretório de sons e efeitos".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
                 assertTrue(promptField.getText().contains("CANAL DARK DE CURIOSIDADES"));assertTrue(promptField.getText().contains("DIREÇÃO SONORA"));
@@ -65,6 +65,14 @@ class EditorViewTest {
                 session.states().set("imagem", fixture.toString());
                 var preview = (megalodonte.components.ImagePreview) session.component("preview");
                 assertTrue(preview.hasImage());
+                ((Region)root).resize(1320,820);root.applyCss();root.layout();
+                var overlay=(javafx.scene.canvas.Canvas)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().getLast();
+                preview.setVisualEffect("particles",0,0);
+                var first=overlay.snapshot(null,null);preview.setVisualEffect("particles",0,3);
+                var later=overlay.snapshot(null,null);int changed=0;
+                for(int y=0;y<(int)first.getHeight();y++)for(int x=0;x<(int)first.getWidth();x++)
+                    if(first.getPixelReader().getArgb(x,y)!=later.getPixelReader().getArgb(x,y))changed++;
+                assertTrue(changed>0,"Particle overlay must move in the editor preview");
                 session.states().set("imagem", "");
                 var timeline = (megalodonte.components.ImageSequence) session.component("timeline"); assertEquals(3,timeline.itemCount());
                 session.states().set("duracao", "8,5"); session.invoke("applyDuration"); assertTrue(session.states().string("resumo").get().contains("18.5"));
