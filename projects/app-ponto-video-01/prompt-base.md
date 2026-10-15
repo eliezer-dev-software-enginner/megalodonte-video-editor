@@ -13,3 +13,5 @@ O campo `visualEffect` é opcional e fica nos metadados da cena, nunca no roteir
 ## Som e entrega
 
 Pesquise os sons no diretório configurado no editor e anexe apenas os que fizerem sentido, cada um em `audio.effects`. Preserve a narração e a música já anexadas, mantendo a fala inteligível. Ao finalizar, documente as cenas com efeitos, os assets usados, a sincronização e o caminho do projeto.
+
+Para o vídeo 1, a biblioteca atual não contém efeitos sonoros pontuais claramente adequados ao tom de apresentação e desenvolvimento do aplicativo. Os arquivos inventariados são sobretudo ambiências industriais, drones sombrios e sons de ficção científica; o `whooshing-by-120-bpm.wav` também é descrito pelo autor como uma sequência de sintetizadores para horror/paranormal/ficção científica. Não force seu uso. Mantenha `audio.effects` vazio enquanto não houver um som realmente apropriado. O lofi discreto já serve de fundo à narração.

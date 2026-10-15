@@ -8,6 +8,7 @@ import java.util.*;
 public final class Editor extends ViewScript {
     private VideoProject project = new VideoProject();
     private Path projectFile;
+    private String projectRevision;
     private final EditorSettings settingsStore=new EditorSettings();
     private EditorSettings.Values settings=new EditorSettings.Values("",EditorSettings.DEFAULT_SOUNDS,EditorSettings.defaultPrompt());
     private SettingsWindow settingsWindow;
@@ -48,7 +49,7 @@ public final class Editor extends ViewScript {
                     javafx.application.Platform.runLater(()-> {
                         if(disposed || imageJob!=job || job.cancelled() || project!=targetProject) { applied.completeExceptionally(new java.util.concurrent.CancellationException());return; }
                         project.clips.get(index).image=file.toString(); refresh();
-                        try { project.save(projectFile);applied.complete(null); }
+                        try { project.save(projectFile,projectRevision);projectRevision=VideoProject.revision(projectFile);applied.complete(null); }
                         catch(Exception e) { applied.completeExceptionally(e); }
                     });
                     try { applied.get(); }
@@ -301,7 +302,7 @@ public final class Editor extends ViewScript {
         }
         try {
             FileSelections.protectAssets(project,target,projectFile,false);
-            project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip(); project.save(target); projectFile=target;
+            project.script=text("roteiro"); project.openaiApiKey=text("openaiKey").strip(); project.save(target,projectFile==null ? null : projectRevision); projectFile=target;projectRevision=VideoProject.revision(target);
         } catch(Exception e) { message("Não foi possível salvar: " + e.getMessage()); return; }
         try { lastProject.remember(projectFile); message("Projeto salvo: " + projectFile); }
         catch(Exception e) { message("Projeto salvo: " + projectFile + ". Não foi possível guardar o caminho para a próxima inicialização: " + e.getMessage()); }
@@ -314,8 +315,9 @@ public final class Editor extends ViewScript {
             applyProject(loaded,file); message("Projeto aberto." + missingAssetsMessage());
         } catch (Exception e) { message("Não foi possível abrir: " + e.getMessage()); }
     }
-    private void applyProject(VideoProject loaded,Path file) {
+    private void applyProject(VideoProject loaded,Path file) throws java.io.IOException {
         timelineChanged(); project=loaded; projectFile=file.toAbsolutePath().normalize();
+        projectRevision=VideoProject.revision(projectFile);
         refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settingsLoaded ? settings.apiKey : project.openaiApiKey);
         set("efeitoSelecionado",project.effects.isEmpty() ? -1 : 0);set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }

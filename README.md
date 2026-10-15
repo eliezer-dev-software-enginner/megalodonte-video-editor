@@ -30,6 +30,8 @@ A timeline tem miniaturas, intervalos cumulativos e rolagem horizontal. A roda d
 
 Após salvar com sucesso, o editor guarda o caminho absoluto do projeto e o restaura na próxima inicialização, incluindo roteiro, cenas, imagens, áudios e volumes. Abrir outro projeto sem salvá-lo não altera essa preferência. Alterações não salvas continuam sem autosave.
 
+Ao abrir o projeto, o editor registra a versão do manifesto. Se outra janela ou processo alterar o arquivo no disco, Salvar projeto e o salvamento durante a geração de imagens recusam sobrescrevê-lo e pedem para reabrir a versão atual. Isso evita perder imagens, narração e tempos sincronizados por salvar uma janela defasada.
+
 A preferência fica em `$XDG_CONFIG_HOME/megalodonte-video-editor/last-project.properties` ou `~/.config/megalodonte-video-editor/last-project.properties` no Linux, e em `%APPDATA%/megalodonte-video-editor/last-project.properties` no Windows. Se o projeto tiver sido removido, movido ou estiver inválido, o editor abre vazio e informa a falha. Assets ausentes são informados após a restauração.
 
 ## Seletores de arquivos e últimas pastas

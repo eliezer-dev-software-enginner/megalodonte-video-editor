@@ -41,6 +41,17 @@ class VideoProjectTest {
         assertEquals("particles",VideoProject.load(file).clips.getFirst().visualEffect);
         assertThrows(IllegalArgumentException.class,()->VideoProject.validateVisualEffect("snow"));
     }
+    @Test void staleEditorCannotOverwriteExternallyUpdatedManifest() throws Exception {
+        var file=directory.resolve("shared.mvideo.json");var first=VideoProject.fromScript("Versão inicial");first.save(file);
+        var loaded=VideoProject.load(file);String revision=VideoProject.revision(file);
+        var external=VideoProject.fromScript("Narração e cenas novas");external.save(file);
+        loaded.script="Alteração na janela antiga";
+        var error=assertThrows(java.io.IOException.class,()->loaded.save(file,revision));
+        assertTrue(error.getMessage().contains("mudou no disco"));
+        assertEquals("Narração e cenas novas",VideoProject.load(file).script);
+        loaded.save(file,VideoProject.revision(file));
+        assertEquals("Alteração na janela antiga",VideoProject.load(file).script);
+    }
     @Test void savedProjectCarriesAssetsAndSurvivesRemovalOfOriginal() throws Exception {
         var image = directory.resolve("original.png"); Files.write(image, new byte[]{1,2,3});
         var project = VideoProject.fromScript("Cena um\n\nCena dois"); project.clips.getFirst().image = image.toString(); project.clips.getFirst().duration = 7.5;

@@ -83,7 +83,12 @@ public final class VideoProject {
     }
     /** Copies assets into the project folder; JSON is replaced only after assets are ready. */
     public void save(Path file) throws IOException {
+        save(file,null);
+    }
+    /** Refuses to replace a manifest changed by another editor/process since it was loaded. */
+    public void save(Path file,String expectedRevision) throws IOException {
         Path absolute = file.toAbsolutePath(); Files.createDirectories(absolute.getParent());
+        requireRevision(absolute,expectedRevision);
         Path assets = absolute.getParent().resolve(absolute.getFileName() + ".assets"); Files.createDirectories(assets);
         var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script); var scenes = new JsonArray();
         for (Clip clip : clips) {
@@ -103,9 +108,21 @@ public final class VideoProject {
         Path temporary = Files.createTempFile(absolute.getParent(), ".video-project-", ".tmp");
         try {
             Files.writeString(temporary, new GsonBuilder().setPrettyPrinting().create().toJson(root));
+            requireRevision(absolute,expectedRevision);
             try { Files.move(temporary, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
             catch (AtomicMoveNotSupportedException e) { Files.move(temporary, absolute, StandardCopyOption.REPLACE_EXISTING); }
         } finally { Files.deleteIfExists(temporary); }
+    }
+    public static String revision(Path file) throws IOException {
+        if(!Files.isRegularFile(file)) return "";
+        try {
+            byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+    }
+    private static void requireRevision(Path file,String expected) throws IOException {
+        if(expected!=null && !expected.equals(revision(file)))
+            throw new IOException("O projeto mudou no disco desde que foi aberto. Reabra o projeto antes de salvar para não sobrescrever imagens, narração ou sincronização recentes.");
     }
     public static VideoProject load(Path file) throws IOException {
         try {

@@ -30,10 +30,10 @@ class OpenAiGeneratedProjectUiTest {
                 var root=(Parent)app.render().getJavaFxNode();new Scene(root,1320,820);app.onMount();((Region)root).resize(1320,820);
                 var session=app.current();assertEquals(expected.script,session.states().get("roteiro"));
                 session.invoke("generateImages"); assertTrue(session.states().string("mensagem").get().contains("Todas as cenas"));
-                var sequence=(megalodonte.components.v2.HorizontalScroll)session.component("timeline");
-                assertEquals(expected.clips.size(),((HBox)sequence.getContent()).getChildren().size());
-                var effects=(megalodonte.components.v2.HorizontalScroll)session.component("effectsTimeline");
-                assertEquals(expected.effects.size(),((Pane)effects.getContent()).getChildren().stream().filter(n->n.getUserData() instanceof Integer).count());
+                var sequence=(megalodonte.components.ImageSequence)session.component("timeline");
+                assertEquals(expected.clips.size(),sequence.itemCount());
+                var effects=(megalodonte.components.SoundSequence)session.component("effectsTimeline");
+                assertEquals(expected.effects.size(),effects.itemCount());
                 if(!expected.effects.isEmpty()) {
                     session.states().set("efeitoSelecionado",0);session.invoke("selectEffect");root.applyCss();root.layout();
                     var editorScroll=(megalodonte.components.v2.Scroll)session.component("editorScroll");editorScroll.scrollTo(640);root.layout();
