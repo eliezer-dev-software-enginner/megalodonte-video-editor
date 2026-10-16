@@ -7,6 +7,7 @@ import java.util.*;
 
 /** Project model is independent from the UI and future AI providers. */
 public final class VideoProject {
+    public static final double MAX_NARRATION_GAIN = 4.0;
     public static final class Clip {
         public String text;
         public String image = "";
@@ -54,6 +55,12 @@ public final class VideoProject {
         if (!Double.isFinite(percent) || percent < 0 || percent > 100) throw new IllegalArgumentException("Volume deve estar entre 0 e 100%.");
         return percent / 100;
     }
+    public static double narrationGainFromPercent(String text) {
+        double percent = Double.parseDouble(text.strip().replace(',', '.'));
+        if (!Double.isFinite(percent) || percent < 0 || percent > MAX_NARRATION_GAIN * 100)
+            throw new IllegalArgumentException("Volume da narração deve estar entre 0 e 400%.");
+        return percent / 100;
+    }
     public VideoProject snapshot() {
         var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
@@ -98,8 +105,8 @@ public final class VideoProject {
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
         var audio = new JsonObject();
-        audio.add("narration", audioJson(narration,absolute,assets));
-        audio.add("music", audioJson(music,absolute,assets));
+        audio.add("narration", audioJson(narration,absolute,assets,MAX_NARRATION_GAIN));
+        audio.add("music", audioJson(music,absolute,assets,1));
         var sounds=new JsonArray();
         for(var effect:effects) { effect.validate();var json=new Gson().toJsonTree(effect).getAsJsonObject();json.addProperty("file",copyAsset(effect.file,absolute,assets));sounds.add(json); }
         audio.add("effects",sounds);root.add("audio", audio);
@@ -141,8 +148,8 @@ public final class VideoProject {
             }
             if (root.has("audio")) {
                 var audio = root.getAsJsonObject("audio");
-                readAudio(audio.getAsJsonObject("narration"),project.narration,file);
-                readAudio(audio.getAsJsonObject("music"),project.music,file);
+                readAudio(audio.getAsJsonObject("narration"),project.narration,file,MAX_NARRATION_GAIN);
+                readAudio(audio.getAsJsonObject("music"),project.music,file,1);
                 if(audio.has("effects")) for(var element:audio.getAsJsonArray("effects")) {
                     var effect=new Gson().fromJson(element,SoundEffect.class);effect.validate();
                     if(effect.file==null || effect.file.isBlank()) throw new IllegalArgumentException("Efeito sem arquivo");
@@ -189,17 +196,20 @@ public final class VideoProject {
         Path target = assets.resolve(UUID.randomUUID() + "-" + source.getFileName()); Files.copy(source,target);
         return manifest.getParent().relativize(target).toString();
     }
-    private static JsonObject audioJson(AudioTrack track, Path manifest, Path assets) throws IOException {
-        validateVolume(track.volume);
+    private static JsonObject audioJson(AudioTrack track, Path manifest, Path assets,double maximum) throws IOException {
+        validateVolume(track.volume,maximum);
         var json = new JsonObject(); json.addProperty("file",copyAsset(track.file,manifest,assets)); json.addProperty("volume",track.volume); return json;
     }
-    private static void readAudio(JsonObject json, AudioTrack track, Path manifest) {
+    private static void readAudio(JsonObject json, AudioTrack track, Path manifest,double maximum) {
         if (json == null) return;
-        track.volume = json.get("volume").getAsDouble(); validateVolume(track.volume);
+        track.volume = json.get("volume").getAsDouble(); validateVolume(track.volume,maximum);
         track.file = resolveAsset(json.get("file").getAsString(),manifest);
     }
     private static void validateVolume(double volume) {
-        if (!Double.isFinite(volume) || volume < 0 || volume > 1) throw new IllegalArgumentException("Volume inválido");
+        validateVolume(volume,1);
+    }
+    private static void validateVolume(double volume,double maximum) {
+        if (!Double.isFinite(volume) || volume < 0 || volume > maximum) throw new IllegalArgumentException("Volume inválido");
     }
     static void validateVisualEffect(String effect) {
         if(!effect.isBlank() && !effect.equals("particles") && !effect.equals("shake")) throw new IllegalArgumentException("Efeito visual desconhecido: "+effect);

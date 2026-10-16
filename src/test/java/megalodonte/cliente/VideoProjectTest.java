@@ -82,9 +82,19 @@ class VideoProjectTest {
     @Test void defaultsAndPercentVolumesAreValidated() throws Exception {
         var project=new VideoProject(); assertEquals(.15,project.music.volume); assertEquals(1,project.narration.volume);
         assertEquals(.125,VideoProject.volumeFromPercent("12,5")); assertEquals(0,VideoProject.volumeFromPercent("0"));
+        assertEquals(2.5,VideoProject.narrationGainFromPercent("250"));
+        assertThrows(IllegalArgumentException.class,()->VideoProject.narrationGainFromPercent("401"));
         for(String value:new String[]{"NaN","Infinity","-1","101","abc"}) assertThrows(IllegalArgumentException.class,()->VideoProject.volumeFromPercent(value));
         var file=directory.resolve("legacy.json"); Files.writeString(file,"{\"version\":1,\"script\":\"\",\"clips\":[]}");
         var legacy=VideoProject.load(file); assertEquals(.15,legacy.music.volume); assertEquals("",legacy.narration.file);
+    }
+    @Test void amplifiedNarrationGainSurvivesProjectSaveAndLoad() throws Exception {
+        var narration=directory.resolve("quiet-voice.wav");Files.write(narration,new byte[]{1,2,3});
+        var project=new VideoProject();project.narration.file=narration.toString();project.narration.volume=2.5;
+        var file=directory.resolve("amplified.mvideo.json");project.save(file);
+        assertEquals(2.5,VideoProject.load(file).narration.volume);
+        project.music.volume=1.01;
+        assertThrows(IllegalArgumentException.class,()->project.save(directory.resolve("bad-music.mvideo.json")));
     }
 
 }

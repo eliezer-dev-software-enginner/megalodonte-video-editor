@@ -812,7 +812,7 @@
                       {
                         "type": "Text",
                         "props": {
-                          "text": "Narração (%)"
+                          "text": "Narração (0–400%)"
                         }
                       },
                       {

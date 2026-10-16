@@ -32,7 +32,7 @@ final class AudioPreview implements AutoCloseable {
         if (track.file.isBlank()) return null;
         try {
             var player = new MediaPlayer(new Media(Path.of(track.file).toUri().toString()));
-            player.setVolume(track.volume);
+            setGain(player,track.volume);
             if (loop) player.setCycleCount(MediaPlayer.INDEFINITE);
             player.setOnReady(() -> { if (playing) playAt(player,position,loop); else seek(player,position,loop); });
             player.setOnError(() -> error.accept("Áudio indisponível na prévia: " + player.getError().getMessage()));
@@ -43,7 +43,20 @@ final class AudioPreview implements AutoCloseable {
     void position(double seconds) { position = seconds;updateCues(false); }
     void pause() { playing = false; if (narration != null) narration.pause(); if (music != null) music.pause();for(var cue:cues) { cue.player.pause();cue.active=false; } }
     void seek(double seconds) { position = seconds; seek(narration,seconds,false); seek(music,seconds,true);updateCues(true); }
-    void volumes(VideoProject project) { if (narration != null) narration.setVolume(project.narration.volume); if (music != null) music.setVolume(project.music.volume); }
+    void volumes(VideoProject project) { if (narration != null) setGain(narration,project.narration.volume); if (music != null) setGain(music,project.music.volume); }
+    /** JavaFX volume is capped at 1.0, so use a flat equalizer gain for narration amplification in preview. */
+    private static void setGain(MediaPlayer player,double gain) {
+        var equalizer=player.getAudioEqualizer();
+        if(gain>1) {
+            double db=Math.min(12,20*Math.log10(gain));
+            for(var band:equalizer.getBands()) band.setGain(db);
+            equalizer.setEnabled(true);
+            player.setVolume(1);
+        } else {
+            equalizer.setEnabled(false);
+            player.setVolume(gain);
+        }
+    }
     private void updateCues(boolean forceSeek) { for(var cue:cues) updateCue(cue,forceSeek); }
     private void updateCue(Cue cue,boolean forceSeek) {
         boolean active=cue.effect.active(position);

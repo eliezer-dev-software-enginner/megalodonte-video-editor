@@ -142,10 +142,10 @@ public final class Editor extends ViewScript {
     public void removeMusic() { if(generationBusy()) return; pausePlayback(); project.music.file=""; refreshAudio(); audio.load(project,this::audioError); }
     private boolean readVolumes() {
         try {
-            double narration = VideoProject.volumeFromPercent(text("volumeNarracao"));
+            double narration = VideoProject.narrationGainFromPercent(text("volumeNarracao"));
             double music = VideoProject.volumeFromPercent(text("volumeMusica"));
             project.narration.volume = narration; project.music.volume = music; audio.volumes(project); return true;
-        } catch (IllegalArgumentException e) { message("Informe volumes entre 0 e 100%."); return false; }
+        } catch (IllegalArgumentException e) { message("Use narração entre 0 e 400% e música entre 0 e 100%."); return false; }
     }
     public void applyVolumes() { if (readVolumes()) message("Volumes aplicados à prévia e à exportação."); }
     public void exportVideo() { if(generationBusy()) return;

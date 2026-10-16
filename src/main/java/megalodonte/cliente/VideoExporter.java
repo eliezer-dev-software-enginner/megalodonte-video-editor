@@ -25,7 +25,8 @@ public final class VideoExporter {
             rejectOutputSource(target,clip.image);
         }
         for(var track:List.of(project.narration,project.music)) {
-            if(!Double.isFinite(track.volume) || track.volume<0 || track.volume>1) throw new IOException("Volume inválido.");
+            double maxGain=track==project.narration ? VideoProject.MAX_NARRATION_GAIN : 1;
+            if(!Double.isFinite(track.volume) || track.volume<0 || track.volume>maxGain) throw new IOException("Volume inválido.");
             if(!track.file.isBlank()) { if(!Files.isRegularFile(Path.of(track.file))) throw new IOException("Áudio ausente: "+track.file); rejectOutputSource(target,track.file); }
         }
         for(var effect:project.effects) {
