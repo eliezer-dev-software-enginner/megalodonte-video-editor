@@ -3,6 +3,7 @@ import megalodonte.script.ViewScript;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import megalodonte.components.ImagePreview;
+import java.awt.Desktop;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.Consumer;
@@ -241,7 +242,18 @@ public final class Editor extends ViewScript {
         exporter=new VideoExporter(); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
         exportThread=Thread.ofPlatform().daemon(true).name("megalodonte-export").start(() -> {
             String result;
-            try { job.export(snapshot,output,progress -> javafx.application.Platform.runLater(() -> { if (!disposed) set("exportStatus",progress); })); result="Vídeo exportado: "+output; }
+            try {
+                job.export(snapshot,output,progress -> javafx.application.Platform.runLater(() -> { if (!disposed) set("exportStatus",progress); }));
+                try {
+                    Path folder=output.toAbsolutePath().normalize().getParent();
+                    if(folder==null || !Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN))
+                        throw new java.io.IOException("o sistema não disponibilizou a abertura de pastas");
+                    Desktop.getDesktop().open(folder.toFile());
+                    result="Vídeo exportado: "+output+". Pasta aberta no gerenciador de arquivos.";
+                } catch(Exception openError) {
+                    result="Vídeo exportado: "+output+". Não foi possível abrir a pasta automaticamente: "+openError.getMessage();
+                }
+            }
             catch(java.util.concurrent.CancellationException e) { result="Exportação cancelada."; }
             catch(Exception e) { result="Não foi possível exportar: "+e.getMessage(); }
             final String outcome=result;
