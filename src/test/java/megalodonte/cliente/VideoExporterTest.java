@@ -81,6 +81,16 @@ class VideoExporterTest {
         var later=binaryCommand("ffmpeg","-v","error","-ss","0.8","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
         assertFalse(Arrays.equals(first,later));
     }
+    @Test void smoothMotionCueMovesImageOverTime() throws Exception {
+        var striped=new BufferedImage(320,180,BufferedImage.TYPE_INT_RGB);
+        for(int y=0;y<180;y++)for(int x=0;x<320;x++)striped.setRGB(x,y,((x/8+y/8)%2==0 ? Color.WHITE : Color.BLACK).getRGB());
+        var source=directory.resolve("smooth-striped.png");ImageIO.write(striped,"png",source.toFile());
+        var project=VideoProject.fromScript("Movimento suave");var clip=project.clips.getFirst();clip.image=source.toString();clip.duration=1;clip.visualEffect="smooth";
+        var file=directory.resolve("smooth.mp4");new VideoExporter(320,180).export(project,file,message->{});
+        var first=binaryCommand("ffmpeg","-v","error","-ss","0.1","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        var later=binaryCommand("ffmpeg","-v","error","-ss","0.8","-i",file.toString(),"-frames:v","1","-f","rawvideo","-pix_fmt","rgb24","pipe:1");
+        assertFalse(Arrays.equals(first,later),"Smooth motion should change framing during the clip");
+    }
     @Test void cancellationAndMissingAssetsPreserveExistingOutput() throws Exception {
         var output=directory.resolve("existing.mp4"); Files.writeString(output,"original");
         var project=VideoProject.fromScript("Cena");

@@ -19,6 +19,18 @@
       "type": "string",
       "initial": ""
     },
+    "motionEffect": {
+      "type": "string",
+      "initial": "none"
+    },
+    "motionEffectBusy": {
+      "type": "boolean",
+      "initial": false
+    },
+    "motionEffectOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
     "cenaTexto": {
       "type": "string",
       "initial": "Nenhuma cena selecionada"
@@ -55,6 +67,18 @@
       "type": "string",
       "initial": "Nenhuma narração anexada"
     },
+    "whisperStatus": {
+      "type": "string",
+      "initial": ""
+    },
+    "whisperDisabled": {
+      "type": "boolean",
+      "initial": true
+    },
+    "soundStatus": {
+      "type": "string",
+      "initial": ""
+    },
     "musicaNome": {
       "type": "string",
       "initial": "Nenhuma música anexada"
@@ -89,7 +113,7 @@
     },
     "iaStatus": {
       "type": "string",
-      "initial": "OpenAI · lote de teste com até 3 cenas"
+      "initial": "OpenAI · gera e anexa as imagens pendentes em sequência"
     },
     "openaiKey": {
       "type": "string",
@@ -189,6 +213,17 @@
               {
                 "type": "Button",
                 "props": {
+                  "text": "Fechar projeto",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "closeProject"
+                },
+                "id": "closeProjectButton"
+              },
+              {
+                "type": "Button",
+                "props": {
                   "text": "Importar imagens",
                   "height": 36
                 },
@@ -268,6 +303,32 @@
                     "bind": {
                       "source": "imagem"
                     }
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 10
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Efeito em todas as imagens"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "visualEffectSelect",
+                        "props": {
+                          "width": 190,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "motionEffect",
+                          "items": "motionEffectOptions"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "Row",
@@ -763,6 +824,29 @@
                     ]
                   },
                   {
+                    "type": "Button",
+                    "props": {
+                      "text": "Sincronizar com whisper",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "syncNarration"
+                    },
+                    "id": "syncNarrationButton",
+                    "bind": {
+                      "disabled": "whisperDisabled"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 450
+                    },
+                    "bind": {
+                      "text": "whisperStatus"
+                    }
+                  },
+                  {
                     "type": "Text",
                     "props": {
                       "wrapWidth": 450
@@ -975,7 +1059,7 @@
                       "fontSize": 14
                     },
                     "props": {
-                      "text": "Gera as cenas sem imagem. Salve o projeto antes do teste.",
+                      "text": "Gera e anexa todas as cenas sem imagem, em sequência. Salve o projeto antes.",
                       "wrapWidth": 300
                     }
                   },
@@ -983,7 +1067,7 @@
                     "type": "Button",
                     "id": "generateImagesButton",
                     "props": {
-                      "text": "Gerar imagens · até 3 cenas",
+                      "text": "Gerar e anexar imagens",
                       "height": 36
                     },
                     "bind": {
@@ -1015,6 +1099,45 @@
                     },
                     "bind": {
                       "text": "iaStatus"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "style": {
+                      "fontSize": 16
+                    },
+                    "props": {
+                      "text": "SONS PARA O VÍDEO"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "text": "Aplica uma trilha ambiente contínua em volume baixo e efeitos pontuais compatíveis com o roteiro.",
+                      "wrapWidth": 300
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "id": "applySoundsButton",
+                    "props": {
+                      "text": "Aplicar sons",
+                      "height": 36
+                    },
+                    "bind": {
+                      "disabled": "semCenas"
+                    },
+                    "events": {
+                      "onClick": "applySounds"
+                    }
+                  },
+                  {
+                    "type": "Text",
+                    "props": {
+                      "wrapWidth": 300
+                    },
+                    "bind": {
+                      "text": "soundStatus"
                     }
                   },
                   {

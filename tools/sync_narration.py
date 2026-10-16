@@ -44,7 +44,22 @@ def align(clips, words, audio_duration, fps=30):
         pairs = [(j, mapping[j]) for j in range(start, end) if j in mapping]
         ratio = len(pairs) / max(1, end - start)
         anchors = [(j, mapping[j]) for j in range(start, min(end, start + 8)) if j in mapping]
-        if ratio < .65 or len(anchors) < min(3, end - start) or (anchors[0][0] > start + 1 and (ratio < .85 or anchors[0][0] > start + 4)):
+        partial = False
+        if ratio < .65:
+            # A speaker may shorten one scene and continue at the next. Accept only
+            # a contiguous spoken prefix with a clear, later anchor in the next scene.
+            contiguous_prefix = (len(pairs) >= 4 and pairs[0][0] == start and
+                                 all(a[0] + 1 == b[0] and a[1] + 1 == b[1]
+                                     for a, b in zip(pairs, pairs[1:])))
+            next_start, next_end = ranges[i + 1] if i + 1 < len(ranges) else (0, 0)
+            next_pairs = [(j, mapping[j]) for j in range(next_start, next_end) if j in mapping]
+            next_anchors = [pair for pair in next_pairs if pair[0] < next_start + 8]
+            clear_next_scene = (len(next_anchors) >= min(3, next_end - next_start) and
+                                next_anchors[0][1] > pairs[-1][1] and
+                                0 < times[next_anchors[0][1]][0] - times[pairs[-1][1]][1] <= 2.5)
+            partial = contiguous_prefix and ratio >= .25 and clear_next_scene
+        if ((ratio < .65 and not partial) or len(anchors) < min(3, end - start) or
+                (anchors[0][0] > start + 1 and (ratio < .85 or anchors[0][0] > start + 4))):
             raise ValueError(f'Cena {i+1}: correspondência insuficiente; revisar antes de salvar.')
         first = anchors[0][1]
         # A short improvised lead-in may replace the first few words of a scene.
@@ -52,11 +67,13 @@ def align(clips, words, audio_duration, fps=30):
         leading = anchors[0][0] - start
         if leading and first > 0 and (leading == 1 or ratio >= .85):
             first -= min(leading, 2)
-        scenes.append({'scene': i+1, 'text': clips[i]['text'], 'coverage': ratio,
+        scenes.append({'scene': i+1, 'text': clips[i]['text'], 'coverage': ratio, 'partial': partial,
                        'speechStart': times[first][0], 'speechEnd': times[pairs[-1][1]][1]})
     boundaries = [0]
     for previous, following in zip(scenes, scenes[1:]):
-        if following['speechStart'] < previous['speechEnd'] - .2:
+        # Word-level estimates can cross a scene edge by a fraction of a second.
+        # A bounded overlap is resolved at the midpoint; larger conflicts are unsafe.
+        if following['speechStart'] < previous['speechEnd'] - .75:
             raise ValueError('Tempos de fala conflitantes; revisar a transcrição.')
         midpoint = (previous['speechEnd'] + following['speechStart']) / 2
         boundaries.append(round(midpoint * fps))
@@ -96,6 +113,8 @@ def main():
     for scene in report['scenes']:
         rows.append(f'| {scene["scene"]:02} | {scene["start"]:.3f}s | {scene["duration"]:.3f}s | '
                     f'{scene["speechStart"]:.3f}s | {scene["coverage"]:.1%} |')
+        if scene['partial']:
+            rows.append(f'|  |  |  |  | Trecho encurtado na narração; transição mantida pela próxima cena. |')
     (folder / 'relatorio.md').write_text('\n'.join(rows) + '\n')
     print(f'Cobertura {report["coverage"]:.1%}; áudio {duration:.3f}s; timeline {report["timelineDuration"]:.3f}s.')
     for scene in report['scenes']:

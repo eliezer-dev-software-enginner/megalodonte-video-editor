@@ -51,7 +51,7 @@ class OpenAiImageIntegrationTest {
             code.set(200);assertThrows(IOException.class,()->client.generate("Cena"));
             var job=new ImageGenerationJob(client);job.cancel();
             assertThrows(java.util.concurrent.CancellationException.class,()->job.run(VideoProject.fromScript("Cena"),directory,(i,p)->fail(),progress->{}));
-            assertThrows(IllegalArgumentException.class,()->ImageGenerationJob.pending(VideoProject.fromScript("1\n\n2\n\n3\n\n4")));
+            assertEquals(List.of(0,1,2,3),ImageGenerationJob.pending(VideoProject.fromScript("1\n\n2\n\n3\n\n4")));
         } finally { server.stop(0); }
     }
 }

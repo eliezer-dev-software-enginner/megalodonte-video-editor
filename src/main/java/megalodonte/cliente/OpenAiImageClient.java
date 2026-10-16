@@ -32,12 +32,17 @@ final class OpenAiImageClient {
             .header("Authorization","Bearer "+key).header("Content-Type","application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body.toString())).build();
         var response=http.send(request,HttpResponse.BodyHandlers.ofByteArray());
-        if(response.statusCode()!=200) throw new IOException(switch(response.statusCode()) {
+        if(response.statusCode()!=200) {
+            String message=switch(response.statusCode()) {
             case 401 -> "A OpenAI rejeitou a chave da API (401).";
             case 403 -> "A conta não tem acesso ao modelo de imagens solicitado (403).";
             case 429 -> "A OpenAI informou limite ou saldo indisponível (429). Nenhuma retentativa automática foi feita.";
             default -> "A geração de imagem falhou na OpenAI (HTTP "+response.statusCode()+").";
-        });
+            };
+            String detail=errorDetail(response.body());
+            if(!detail.isBlank()) message += " Detalhe: " + detail;
+            throw new IOException(message);
+        }
         if(response.body().length>64*1024*1024) throw new IOException("Resposta de imagem acima do limite de tamanho.");
         try {
             var json=JsonParser.parseString(new String(response.body(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
@@ -46,5 +51,14 @@ final class OpenAiImageClient {
             var image=ImageIO.read(new ByteArrayInputStream(bytes));if(image==null) throw new IllegalArgumentException();
             var png=new ByteArrayOutputStream(); ImageIO.write(image,"png",png);image.flush();return png.toByteArray();
         } catch(RuntimeException e) { throw new IOException("A API não devolveu uma imagem válida em base64."); }
+    }
+    private String errorDetail(byte[] body) {
+        try {
+            var error=JsonParser.parseString(new String(body,java.nio.charset.StandardCharsets.UTF_8))
+                .getAsJsonObject().getAsJsonObject("error");
+            if(error==null || !error.has("message")) return "";
+            String detail=error.get("message").getAsString().replace(key,"[chave ocultada]").replaceAll("\\s+"," ").strip();
+            return detail.length()>400 ? detail.substring(0,400)+"…" : detail;
+        } catch(RuntimeException ignored) { return ""; }
     }
 }

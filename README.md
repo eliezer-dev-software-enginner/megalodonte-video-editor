@@ -24,11 +24,15 @@ O formato é fixo: **YouTube horizontal 16:9**. A prévia mantém um quadro 16:9
 
 **▶ Play** reproduz a sequência respeitando a duração de cada cena. O mesmo botão pausa; **↺ Início** interrompe e retorna ao começo. O contador mostra o tempo atual e o total. Ao terminar, Play reinicia a sequência. Selecionar uma cena posiciona a reprodução no início dela.
 
+O seletor **Efeito em todas as imagens** aplica a escolha a cada cena: **Movimento suave** cria um zoom e deslocamento lentos, **Partículas** adiciona pontos flutuantes, **Tremor leve** move discretamente o enquadramento, e **Nenhum** remove esses efeitos. A escolha atual também vale para cenas criadas depois; salve o projeto para persistir as alterações.
+
 A timeline tem miniaturas, intervalos cumulativos e rolagem horizontal. A roda do mouse e o gesto horizontal do trackpad rolam a timeline; a barra pode ser arrastada. Os painéis central e direito usam o scroll v2 do Megalodonte. A janela pode ser redimensionada ou maximizada, e os painéis rolam quando o conteúdo ultrapassa a área disponível. Imagens ausentes mostram uma prévia vazia e podem ser substituídas. A prévia e a exportação usam imagens, narração e música locais. A geração de imagens já pode usar a OpenAI. A narração continua sendo anexada como arquivo local. O roteiro editado não altera cenas existentes automaticamente; recriar as cenas pede confirmação.
 
 ## Restaurar o último projeto salvo
 
 Após salvar com sucesso, o editor guarda o caminho absoluto do projeto e o restaura na próxima inicialização, incluindo roteiro, cenas, imagens, áudios e volumes. Abrir outro projeto sem salvá-lo não altera essa preferência. Alterações não salvas continuam sem autosave.
+
+**Fechar projeto** limpa o roteiro, a timeline e os áudios da sessão, e remove a preferência de restauração para que o editor abra vazio na próxima inicialização. Se houver alterações não salvas, o editor pede confirmação antes de descartá-las. O arquivo do projeto e seus assets permanecem no disco.
 
 Ao abrir o projeto, o editor registra a versão do manifesto. Se outra janela ou processo alterar o arquivo no disco, Salvar projeto e o salvamento durante a geração de imagens recusam sobrescrevê-lo e pedem para reabrir a versão atual. Isso evita perder imagens, narração e tempos sincronizados por salvar uma janela defasada.
 
@@ -46,6 +50,8 @@ No painel central, use **Anexar narração** e **Adicionar música de fundo** pa
 
 Os áudios e seus volumes são incluídos no projeto salvo, junto às imagens. Recriar as cenas preserva as faixas. Play reproduz o áudio a partir da posição atual; música repete até o fim do vídeo e a narração fica em silêncio quando termina. A prévia usa JavaFX Media: formatos e codecs disponíveis dependem do sistema. Falhas da prévia são informadas e não impedem exportar com FFmpeg.
 
+No painel direito, **Aplicar sons** escolhe uma trilha ambiente na pasta definida em **Configurações** e a repete até o fim do vídeo em volume baixo. Também seleciona efeitos pontuais por palavras do roteiro, coloca cada um na cena correspondente e os exibe na timeline de efeitos. A ação preserva música existente e não duplica os efeitos ao clicar novamente. Novos arquivos de som são copiados para os assets do projeto; imagens e narração existentes não são recopiadas.
+
 **Exportar vídeo** gera MP4 horizontal em **1920 × 1080, 30 fps**, com vídeo H.264 e áudio AAC estéreo, quando há faixas anexadas. Todas as cenas precisam de uma imagem. Imagens são encaixadas sem distorção, com barras pretas; a duração segue a timeline, com precisão de um frame por cena. Narração é cortada no fim do vídeo ou completada com silêncio; música é repetida e cortada no fim. Os volumes aplicados são usados na mistura.
 
 A exportação requer **FFmpeg instalado e disponível como `ffmpeg` no PATH**. Já está disponível no ambiente utilizado para desenvolver este projeto; não é incorporado ao instalador. FFprobe é usado apenas nos testes. Exportar funciona em segundo plano e permite **Cancelar exportação**. O arquivo final só é substituído quando a renderização termina com sucesso. A exportação usa uma cópia do estado do projeto no momento do clique, portanto alterações posteriores não afetam o vídeo em andamento. Fechar o editor cancela a exportação.
@@ -62,14 +68,14 @@ Os testes do editor verificam separação do roteiro, portabilidade das imagens 
 Detalhes e decisões: [arquitetura](docs/arquitetura.md).
 
 
-## Gerar imagens com OpenAI — teste inicial
+## Gerar imagens com OpenAI
 
 1. Cole um roteiro curto, separando as cenas por uma linha em branco, e clique em **Criar cenas do roteiro**.
 2. Salve o projeto para definir onde os assets serão gravados.
 3. Abra **Configurações** e informe a chave no campo oculto **OpenAI API key**, ou inicie o editor com `OPENAI_API_KEY` configurada.
-4. Clique em **Gerar imagens · até 3 cenas**. Os resultados vão diretamente para as cenas sem imagem, em ordem, e o manifesto é atualizado após cada resultado.
+4. Clique em **Gerar e anexar imagens**. O editor processa todas as cenas sem imagem em sequência; cada PNG recebido é anexado à cena correspondente e o manifesto é atualizado logo após cada resultado.
 
-O teste inicial permite até três cenas sem imagem por lote. Cenas que já têm imagem não são cobradas novamente por esse botão. O roteiro é separado localmente; o texto de cada cena e um trecho de contexto são enviados ao endpoint de imagens. Os padrões são `gpt-image-2`, `1536x864` (16:9), qualidade `low` e PNG. São configuráveis via `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE` e `OPENAI_IMAGE_QUALITY`; as combinações precisam ser suportadas pelo modelo escolhido. Contrato verificado na [API oficial de geração de imagens](https://developers.openai.com/api/reference/resources/images/methods/generate).
+O botão gera somente cenas sem imagem, então pode ser usado novamente após uma falha ou cancelamento sem repetir cenas já concluídas. Cada imagem é uma chamada separada à API e pode gerar cobrança. O roteiro é separado localmente; o texto de cada cena e um trecho de contexto são enviados ao endpoint de imagens. Os padrões são `gpt-image-2`, `1536x864` (16:9), qualidade `low` e PNG. São configuráveis via `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE` e `OPENAI_IMAGE_QUALITY`; as combinações precisam ser suportadas pelo modelo escolhido. Contrato verificado na [API oficial de geração de imagens](https://developers.openai.com/api/reference/resources/images/methods/generate).
 
 A API usa a chave informada e pode gerar cobrança na conta correspondente. A chave informada em Configurações é salva somente nas preferências locais do aplicativo, com permissões restritas, e nunca entra no manifesto do projeto. Ao abrir um projeto antigo que ainda contenha `metadata.openaiApiKey`, o editor migra a chave para as preferências locais quando elas não têm uma chave definida e remove o campo do manifesto sem alterar as cenas nem os assets. Uma chave local já configurada prevalece. A variável de ambiente continua como alternativa quando o campo está vazio. Não há retentativas automáticas: se a API falhar, as cenas já prontas permanecem anexadas; clicar novamente solicita somente as pendentes. Cancelar interrompe o lote e conserva as imagens anexadas. Uma solicitação já enviada pode ter sido processada pela API antes do cancelamento.
 
@@ -115,23 +121,22 @@ Para uma ênfase pontual, `visualEffect: "shake"` aplica um tremor leve à cena 
 
 ### Sincronizar cenas com narração local
 
-Os scripts em `tools/` usam faster-whisper no próprio computador para obter tempos de palavras e comparar a fala com o texto de cada cena. O áudio não é enviado para uma API. Instale uma vez em um ambiente isolado:
+Depois de anexar uma narração, clique em **Sincronizar com whisper**, logo abaixo de **Anexar narração**. O editor salva o projeto, transcreve em segundo plano e ajusta as durações das cenas em sequência. O estado aparece abaixo do botão; durante a transcrição o editor não permite alterar o projeto. Antes de aplicar os tempos, é criada uma cópia `.antes-sincronizacao.mvideo.json`. O áudio é processado localmente e não é enviado para uma API.
+
+É necessário preparar faster-whisper uma vez neste computador. Os scripts e a configuração ficam em `tools/`:
 
 ```bash
 python3 -m venv .local-asr/venv
 .local-asr/venv/bin/python -m pip install -r tools/requirements-asr.txt
-.local-asr/venv/bin/python tools/transcribe_narration.py projects/meu-projeto/projeto.mvideo.json
-python3 tools/sync_narration.py projects/meu-projeto/projeto.mvideo.json
-python3 tools/sync_narration.py projects/meu-projeto/projeto.mvideo.json --apply
 ```
 
-O primeiro uso baixa o modelo multilingual `small`; o cache e o ambiente ficam em `.local-asr`, ignorado pelo Git. Sem `--apply`, somente o relatório é criado. Ao aplicar, o script preserva uma cópia do manifesto e altera apenas as durações das cenas. Ele rejeita áudios diferentes da transcrição ou com baixa correspondência ao roteiro, e verifica alterações concorrentes no manifesto. As trocas são posicionadas entre o fim da fala anterior e o início da próxima, arredondadas a 30 fps; a última cena cobre toda a narração. Timestamps de ASR são estimativas: revise as transições na prévia. Reabra o projeto no editor após executar os scripts.
+O primeiro uso baixa o modelo multilingual `small`; o cache e o ambiente ficam em `.local-asr`, ignorado pelo Git. A distribuição inclui os scripts e pode usar o Python do ambiente `.local-asr`; para outro local, configure `megalodonte.whisper.python` com o caminho do executável. O alinhador exige pelo menos 75% de correspondência global e rejeita divergências grandes. Se uma fala encurtar uma cena, aceita apenas um prefixo falado claro seguido imediatamente por palavras reconhecíveis da cena seguinte; cruzamentos de timestamps de até 0,75s são resolvidos pelo ponto médio, conflitos maiores são recusados. A última cena cobre o áudio inteiro. Timestamps são estimativas: revise os cortes na prévia.
 
 ### Configurações e prompt base
 
 O botão **Configurações** abre uma janela com UI declarativa JSONC e scroll Megalodonte. Ela reúne a chave OpenAI oculta, a pasta da biblioteca de sons e o prompt base editável. **Salvar configurações** persiste esses valores em `editor-settings.json` no diretório de preferências do usuário; **Cancelar** não altera os valores salvos. A pasta deve existir e ser legível. No Linux, o arquivo de preferências é gravado com permissões 600. A chave não aparece mais na tela principal.
 
-A biblioteca inicia em `/home/eliezer/Desktop/backup/sounds`. O prompt padrão mantém o texto do Canal Dark de Curiosidades fornecido pelo usuário, acrescenta a pergunta de tema/duração e orienta a seleção de sons por cena. A versão completa para revisão está em [docs/prompts/gerar-video.md](docs/prompts/gerar-video.md); a cópia embarcada fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
+A biblioteca inicia em `/home/eliezer/Desktop/backup/sounds`. Os prompts foram separados por função. Use [roteirista-conversacional.md](docs/prompts/roteirista-conversacional.md) em qualquer agente que converse sobre tema e duração, pesquise e escreva a narração. O prompt editável nas Configurações agora é [configurar-projeto-video.md](docs/prompts/configurar-projeto-video.md): ele recebe o roteiro pronto e orienta a configuração de cenas, imagens, música e efeitos individuais na timeline, sem reescrever as falas. O padrão embarcado fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
 
 O agente de produção pode executar `python3 tools/generation_settings.py` para consultar a pasta e o prompt sem imprimir a chave. Os sons devem ser planejados por cena e anexados individualmente em `audio.effects`, preservando a narração e a música existente. O prompt e a biblioteca orientam o agente de produção; o botão de geração de imagens continua solicitando somente imagens, sem disparar produção automática de áudio.
 

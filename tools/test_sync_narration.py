@@ -25,14 +25,32 @@ class AlignmentTest(unittest.TestCase):
         self.assertGreater(result['coverage'],.75)
         self.assertLess(result['scenes'][1]['start'],words[5]['start'])
 
+    def test_truncated_scene_prefix_uses_clear_next_scene_anchor(self):
+        clips=[{'text':'A expectativa é combinar competências para investigar novas maneiras importantes para os experimentos.'},
+               {'text':'Mas é importante compreender em que estágio se encontra.'},
+               {'text':'A pergunta continua aberta hoje.'}]
+        spoken='A expectativa é combinar competências para investigar mas é importante compreender em que estágio se encontra a pergunta continua aberta hoje'.split()
+        words=[dict(text=word,start=.5*i,end=.5*i+.3) for i,word in enumerate(spoken)]
+        result=align(clips,words,11)
+        self.assertTrue(result['scenes'][0]['partial'])
+        self.assertFalse(result['scenes'][1]['partial'])
+        self.assertGreater(result['scenes'][1]['start'],result['scenes'][0]['speechEnd'])
+
+    def test_unanchored_partial_scene_is_rejected(self):
+        clips=[{'text':'A expectativa é combinar essas competências para investigar novas maneiras diferentes e interessantes.'},
+               {'text':'Mas é importante compreender em que estágio essa iniciativa realmente se encontra.'}]
+        spoken='A expectativa é combinar essas competências para investigar outra frase sem relação alguma mas é importante compreender em que estágio essa iniciativa realmente se encontra'.split()
+        words=[dict(text=word,start=.5*i,end=.5*i+.3) for i,word in enumerate(spoken)]
+        with self.assertRaises(ValueError): align(clips,words,12)
+
     def test_unrelated_narration_is_rejected(self):
         with self.assertRaises(ValueError):
             align([{'text': 'O Google anunciou um acordo nuclear.'}],
                   [{'text': 'Minha bicicleta caiu na praça', 'start': 0, 'end': 2}], 3)
 
     def test_overlapping_scene_speech_is_rejected(self):
-        words = [{'text': t, 'start': .1*i, 'end': .1*i+.3} for i, t in enumerate(['Bom','dia','cidade'])]
-        words += [{'text': t, 'start': .1*i, 'end': .1*i+.3} for i, t in enumerate(['energia','nuclear','chegou'])]
+        words = [{'text': t, 'start': .5*i, 'end': .5*i+.3} for i, t in enumerate(['Bom','dia','cidade'])]
+        words += [{'text': t, 'start': .5*i, 'end': .5*i+.3} for i, t in enumerate(['energia','nuclear','chegou'])]
         with self.assertRaises(ValueError):
             align([{'text': 'Bom dia cidade'}, {'text': 'energia nuclear chegou'}], words, 3)
 

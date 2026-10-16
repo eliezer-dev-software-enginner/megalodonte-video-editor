@@ -54,6 +54,11 @@ public final class VideoExporter {
                     double fade=Math.min(.25,clip.duration/4);
                     filter+=",fade=t=in:st=0:d="+fade+",fade=t=out:st="+Math.max(0,frames/30.0-fade)+":d="+fade;
                 }
+                if(clip.visualEffect.equals("smooth")) {
+                    String frameProgress="on/"+Math.max(1,frames-1);
+                    filter="scale="+(width*2)+":"+(height*2)+":force_original_aspect_ratio=increase,crop="+(width*2)+":"+(height*2)
+                        +",zoompan=z='1+0.035*"+frameProgress+"':x='iw/2-iw/zoom/2+sin(on*0.025)*iw*0.002':y='ih/2-ih/zoom/2+(cos(on*0.021)-1)*ih*0.0015':d=1:s="+width+"x"+height+":fps=30,setsar=1";
+                }
                 if(clip.visualEffect.equals("particles")) filter+=particleFilter(i);
                 if(clip.visualEffect.equals("shake")) {
                     int marginX=Math.max(2,(int)Math.round(width/120.0))*2, marginY=Math.max(2,(int)Math.round(height/120.0))*2;

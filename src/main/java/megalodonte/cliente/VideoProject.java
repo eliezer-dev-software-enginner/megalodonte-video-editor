@@ -212,7 +212,7 @@ public final class VideoProject {
         if (!Double.isFinite(volume) || volume < 0 || volume > maximum) throw new IllegalArgumentException("Volume inválido");
     }
     static void validateVisualEffect(String effect) {
-        if(!effect.isBlank() && !effect.equals("particles") && !effect.equals("shake")) throw new IllegalArgumentException("Efeito visual desconhecido: "+effect);
+        if(!effect.isBlank() && !effect.equals("particles") && !effect.equals("shake") && !effect.equals("smooth")) throw new IllegalArgumentException("Efeito visual desconhecido: "+effect);
     }
     private static String resolveAsset(String name, Path manifest) {
         if (name.isBlank()) return "";

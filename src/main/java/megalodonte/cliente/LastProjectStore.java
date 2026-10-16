@@ -30,6 +30,7 @@ final class LastProjectStore {
             catch (AtomicMoveNotSupportedException e) { Files.move(temp,settings,StandardCopyOption.REPLACE_EXISTING); }
         } finally { Files.deleteIfExists(temp); }
     }
+    void clear() throws IOException { Files.deleteIfExists(settings); }
     static Path settingsDirectory() {
         String override=System.getProperty("megalodonte.editor.settingsDir");
         if (override!=null && !override.isBlank()) return Path.of(override);

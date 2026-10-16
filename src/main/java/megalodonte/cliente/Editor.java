@@ -5,10 +5,12 @@ import javafx.scene.image.Image;
 import megalodonte.components.ImagePreview;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Consumer;
 public final class Editor extends ViewScript {
     private VideoProject project = new VideoProject();
     private Path projectFile;
     private String projectRevision;
+    private VideoProject savedProject;
     private final EditorSettings settingsStore=new EditorSettings();
     private EditorSettings.Values settings=new EditorSettings.Values("",EditorSettings.DEFAULT_SOUNDS,EditorSettings.defaultPrompt());
     private SettingsWindow settingsWindow;
@@ -31,7 +33,14 @@ public final class Editor extends ViewScript {
     private Thread exportThread;
     private ImageGenerationJob imageJob;
     private Thread imageThread;
+    private WhisperSync whisperSync;
+    private Thread whisperThread;
+    private Consumer<String> motionEffectListener;
+    private String lastMotionEffect="none";
+    private boolean syncingMotionEffect;
+    private boolean motionEffectApplying;
     public void generateImages() {
+        if(generationBusy()) return;
         if(imageJob!=null) return;
         OpenAiImageClient client;
         try { ImageGenerationJob.pending(project); client=OpenAiImageClient.fromSessionKey(text("openaiKey")); }
@@ -49,7 +58,7 @@ public final class Editor extends ViewScript {
                     javafx.application.Platform.runLater(()-> {
                         if(disposed || imageJob!=job || job.cancelled() || project!=targetProject) { applied.completeExceptionally(new java.util.concurrent.CancellationException());return; }
                         project.clips.get(index).image=file.toString(); refresh();
-                        try { project.save(projectFile,projectRevision);projectRevision=VideoProject.revision(projectFile);applied.complete(null); }
+                        try { project.save(projectFile,projectRevision);projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();applied.complete(null); }
                         catch(Exception e) { applied.completeExceptionally(e); }
                     });
                     try { applied.get(); }
@@ -67,13 +76,58 @@ public final class Editor extends ViewScript {
     }
     public void cancelImages() { if(imageJob!=null) { imageJob.cancel();if(imageThread!=null) imageThread.interrupt();set("iaStatus","Cancelando geração…"); } }
     private boolean generationBusy() {
+        if(motionEffectApplying) { message("Aguarde a aplicação do efeito visual terminar antes de alterar o projeto.");return true; }
+        if(whisperThread!=null) { message("Aguarde a sincronização com o Whisper terminar antes de alterar o projeto."); return true; }
         if(imageJob==null) return false;
         message("Aguarde ou cancele a geração de imagens antes de alterar o projeto.");return true;
     }
 
+    public void syncNarration() {
+        if(generationBusy()) return;
+        if(project.narration.file.isBlank()) { message("Anexe uma narração antes de sincronizar."); return; }
+        if(project.clips.isEmpty()) { message("Crie as cenas do roteiro antes de sincronizar."); return; }
+        if(projectFile==null) { message("Salve o projeto antes de sincronizar a narração."); return; }
+        try {
+            project.script=text("roteiro");
+            project.save(projectFile,projectRevision);
+            projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();
+            pausePlayback();
+            whisperSync=new WhisperSync(projectFile);
+        } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage()); return; }
+        var sync=whisperSync;var targetProject=project;var targetFile=projectFile;
+        whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()-> {
+            String outcome; boolean success=false;
+            try {
+                javafx.application.Platform.runLater(()->set("whisperStatus","Carregando Whisper local…"));
+                sync.run(line->javafx.application.Platform.runLater(()-> {
+                    if(!disposed && whisperSync==sync) set("whisperStatus",line);
+                }));
+                var report=new com.google.gson.JsonParser().parseString(Files.readString(targetFile.getParent().resolve("sincronizacao/alinhamento.json"))).getAsJsonObject();
+                long partial=report.getAsJsonArray("scenes").asList().stream().filter(scene->scene.getAsJsonObject().get("partial").getAsBoolean()).count();
+                success=true;
+                outcome="Narração sincronizada com Whisper: "+report.getAsJsonArray("scenes").size()+" cenas, "+String.format(Locale.forLanguageTag("pt-BR"),"%.1f%%",report.get("coverage").getAsDouble()*100)+" de correspondência."+
+                        (partial>0 ? " "+partial+" cena(s) tinham fala encurtada e foram ajustadas pela transição seguinte." : "");
+            } catch(InterruptedException e) { Thread.currentThread().interrupt();outcome="Sincronização cancelada. Nenhuma duração foi aplicada."; }
+            catch(Exception e) { outcome="Não foi possível sincronizar: "+e.getMessage(); }
+            final String result=outcome;final boolean applied=success;
+            javafx.application.Platform.runLater(()-> {
+                if(disposed || whisperSync!=sync)return;
+                whisperThread=null;whisperSync=null;
+                if(applied && project==targetProject && Objects.equals(projectFile,targetFile)) {
+                    try { applyProject(VideoProject.load(targetFile),targetFile); }
+                    catch(Exception e) { set("whisperStatus","Sincronização gravada, mas não foi possível recarregar: "+e.getMessage());message((String)get("whisperStatus"));return; }
+                }
+                set("whisperDisabled",project.narration.file.isBlank());set("whisperStatus",result);message(result);
+            });
+        });
+        set("whisperDisabled",true);set("whisperStatus","Preparando sincronização local…");
+    }
+
     @Override public void onDestroy() {
         if(settingsWindow!=null) settingsWindow.close();
-        disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt(); if (playback != null) playback.stop(); playing = false;
+        disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt();
+        if(whisperSync!=null) whisperSync.cancel();if(whisperThread!=null) whisperThread.interrupt();if (playback != null) playback.stop(); playing = false;
+        if(motionEffectListener!=null) state("motionEffect",String.class).unsubscribe(motionEffectListener);
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
     }
     private void audioError(String error) { if (!disposed) message(error); }
@@ -82,6 +136,7 @@ public final class Editor extends ViewScript {
         set("musicaNome",project.music.file.isBlank() ? "Nenhuma música anexada" : "Música: " + Path.of(project.music.file).getFileName());
         set("volumeNarracao",Double.toString(project.narration.volume*100)); set("volumeMusica",Double.toString(project.music.volume*100));
         set("semNarracao",project.narration.file.isBlank()); set("semMusica",project.music.file.isBlank());
+        set("whisperDisabled",project.narration.file.isBlank() || whisperThread!=null);
     }
     private VideoProject.SoundEffect selectedEffect() {
         int i=(Integer)get("efeitoSelecionado");return i>=0 && i<project.effects.size() ? project.effects.get(i) : null;
@@ -131,6 +186,32 @@ public final class Editor extends ViewScript {
     }
     public void attachNarration() { if(generationBusy()) return; attachAudio(project.narration); }
     public void attachMusic() { if(generationBusy()) return; attachAudio(project.music); }
+    public void applySounds() {
+        if(generationBusy()) return;
+        if(project.clips.isEmpty()) { set("soundStatus","Crie as cenas do roteiro antes de aplicar sons."); return; }
+        if(projectFile==null) { set("soundStatus","Salve o projeto antes de aplicar sons."); return; }
+        try {
+            Path library=EditorSettings.validateSounds(settings.soundsDirectory);
+            var updated=project.snapshot();updated.script=text("roteiro");
+            var additions=SoundApplicator.apply(updated,library);
+            if(additions.addedCount()==0) {
+                String status=project.music.file.isBlank() ? "Não encontrei uma trilha ambiente nem efeitos correspondentes na biblioteca." :
+                        "A música existente foi preservada; os efeitos aplicáveis já estão na timeline.";
+                set("soundStatus",status);message(status);return;
+            }
+            Path backup=projectFile.resolveSibling(projectFile.getFileName().toString().replace(".mvideo.json","")+".antes-sons.mvideo.json");
+            if(!Files.exists(backup)) Files.copy(projectFile,backup);
+            pausePlayback();
+            SoundProjectStore.saveAdditions(updated,projectFile,projectRevision,additions);
+            project=VideoProject.load(projectFile);projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();
+            refreshAudio();refreshEffects();refresh();audio.load(project,this::audioError);
+            String status=(additions.musicAdded() ? "Música de fundo adicionada em volume baixo e será repetida até o fim do vídeo. " : "Música de fundo existente preservada. ")+
+                    additions.effectsAdded().size()+" efeito(s) discreto(s) anexado(s) à timeline e salvo(s) no projeto.";
+            set("soundStatus",status);message(status);
+        } catch(Exception e) {
+            String status="Não foi possível aplicar os sons: "+e.getMessage();set("soundStatus",status);message(status);
+        }
+    }
     private void attachAudio(VideoProject.AudioTrack track) {
         if (!readVolumes()) return;
         var kind=track==project.narration ? FileDialogs.Kind.NARRATION : FileDialogs.Kind.MUSIC;
@@ -147,7 +228,7 @@ public final class Editor extends ViewScript {
             project.narration.volume = narration; project.music.volume = music; audio.volumes(project); return true;
         } catch (IllegalArgumentException e) { message("Use narração entre 0 e 400% e música entre 0 e 100%."); return false; }
     }
-    public void applyVolumes() { if (readVolumes()) message("Volumes aplicados à prévia e à exportação."); }
+    public void applyVolumes() { if(generationBusy()) return; if (readVolumes()) message("Volumes aplicados à prévia e à exportação."); }
     public void exportVideo() { if(generationBusy()) return;
         if (exporter != null || !readVolumes()) return;
         pausePlayback();
@@ -174,6 +255,7 @@ public final class Editor extends ViewScript {
     private double playhead;
     private long lastFrame;
     public void togglePlay() {
+        if(generationBusy()) return;
         if (playing) { pausePlayback(); return; }
         if (project.clips.isEmpty() || !readVolumes()) return;
         if (playhead >= project.duration()) playhead = 0;
@@ -214,6 +296,10 @@ public final class Editor extends ViewScript {
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
     @Override public void onMount() {
+        set("motionEffectOptions",new com.google.gson.Gson().toJson(List.of(
+            Map.of("value","none","label","Nenhum"),Map.of("value","smooth","label","Movimento suave"),
+            Map.of("value","particles","label","Partículas"),Map.of("value","shake","label","Tremor leve"),
+            Map.of("value","custom","label","Personalizado por cena"))));
         try { settings=settingsStore.load();settingsLoaded=settingsStore.exists();set("openaiKey",settings.apiKey); }
         catch(java.io.IOException e) { message("Não foi possível carregar as configurações: "+e.getMessage()); }
         refreshAudio(); refresh();
@@ -226,10 +312,19 @@ public final class Editor extends ViewScript {
                 message((initial.isBlank() ? "Último projeto salvo restaurado: " : "Projeto aberto: ") + file + missingAssetsMessage());
             }
         } catch (Exception e) { message("Não foi possível restaurar o último projeto salvo. O editor abriu vazio: " + e.getMessage()); }
+        lastMotionEffect=text("motionEffect");
+        motionEffectListener=value->{
+            if(!syncingMotionEffect && !Objects.equals(value,lastMotionEffect)) {
+                lastMotionEffect=value;
+                applyMotionEffectToAll(value);
+            }
+        };
+        state("motionEffect",String.class).subscribe(motionEffectListener);
     }
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
-        timelineChanged(); var previous=project; project = VideoProject.fromScript(text("roteiro")); project.animateImages=previous.animateImages;
+        timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = VideoProject.fromScript(text("roteiro")); project.animateImages=previous.animateImages;
+        if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
         project.music.file=previous.music.file; project.music.volume=previous.music.volume;project.effects.addAll(previous.effects);audio.load(project,this::audioError); set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
         message("Cenas criadas localmente, uma por parágrafo. Importe as imagens na ordem desejada.");
@@ -244,11 +339,49 @@ public final class Editor extends ViewScript {
     private void refresh() {
         set("semCenas",project.clips.isEmpty());
         set("tempo",String.format(Locale.ROOT,"%.1fs / %.1fs",playhead,project.duration()));
+        syncMotionSelection();
         refreshEffects();set("timeline", project.timeline()); set("resumo", project.clips.size() + " cenas · " + String.format(Locale.ROOT, "%.1f segundos", project.duration())); refreshSelection();
+    }
+    private String selectedMotionForProject() {
+        if(project.clips.isEmpty()) return project.animateImages ? "smooth" : "none";
+        String first=project.clips.getFirst().visualEffect;
+        if(project.clips.stream().anyMatch(clip->!Objects.equals(first,clip.visualEffect))) return "custom";
+        if(first.isBlank() && project.animateImages) return "smooth";
+        return first.isBlank() ? "none" : first;
+    }
+    private void syncMotionSelection() {
+        String value=selectedMotionForProject();
+        syncingMotionEffect=true;
+        try { set("motionEffect",value);lastMotionEffect=value; }
+        finally { syncingMotionEffect=false; }
+    }
+    private void assignMotion(VideoProject target,String effect) {
+        target.animateImages=false;
+        String value=switch(effect) { case "smooth","particles","shake" -> effect; default -> ""; };
+        for(var clip:target.clips) clip.visualEffect=value;
+    }
+    private void applyMotionEffectToAll(String effect) {
+        if(effect.equals("custom")) return;
+        if(generationBusy()) { syncMotionSelection();return; }
+        if(project.clips.isEmpty()) { message("Crie cenas antes de aplicar um efeito às imagens.");syncMotionSelection();return; }
+        pausePlayback();
+        var target=project;int count=target.clips.size();
+        motionEffectApplying=true;set("motionEffectBusy",true);message("Aplicando efeito às imagens…");
+        Thread.ofVirtual().name("video-motion-effect").start(()-> {
+            var plan=Collections.nCopies(count,effect);
+            megalodonte.base.UI.runOnUi(()-> {
+                if(disposed || project!=target)return;
+                for(int i=0;i<Math.min(plan.size(),target.clips.size());i++)target.clips.get(i).visualEffect=switch(plan.get(i)){case "smooth","particles","shake"->plan.get(i);default->"";};
+                target.animateImages=false;motionEffectApplying=false;set("motionEffectBusy",false);refresh();
+                String label=switch(effect) { case "smooth"->"Movimento suave";case "particles"->"Partículas";case "shake"->"Tremor leve";default->"Nenhum efeito"; };
+                message(label+" aplicado a todas as "+count+" imagens. Salve o projeto para manter a alteração.");
+            });
+        });
     }
     private void refreshSelection() {
         var clip = selected(); set("semSelecao", clip == null); set("imagem", clip == null ? "" : clip.image);
-        set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + (clip.visualEffect.isBlank() ? "" : clip.visualEffect.equals("shake") ? " · ✦ Tremor leve" : " · ✦ Partículas") + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
+        String effectLabel=clip==null || clip.visualEffect.isBlank() ? "" : switch(clip.visualEffect) { case "shake"->" · ✦ Tremor leve";case "smooth"->" · ✦ Movimento suave";default->" · ✦ Partículas"; };
+        set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + effectLabel + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
         set("duracao", clip == null ? "5" : Double.toString(clip.duration));
         if(clip!=null)refreshVisualPreview();
         else ((ImagePreview)component("preview")).setVisualEffect("",0,0);
@@ -302,10 +435,30 @@ public final class Editor extends ViewScript {
         }
         try {
             FileSelections.protectAssets(project,target,projectFile,false);
-            project.script=text("roteiro"); project.save(target,projectFile==null ? null : projectRevision); projectFile=target;projectRevision=VideoProject.revision(target);
+            project.script=text("roteiro"); project.save(target,projectFile==null ? null : projectRevision); projectFile=target;projectRevision=VideoProject.revision(target);savedProject=project.snapshot();
         } catch(Exception e) { message("Não foi possível salvar: " + e.getMessage()); return; }
         try { lastProject.remember(projectFile); message("Projeto salvo: " + projectFile); }
         catch(Exception e) { message("Projeto salvo: " + projectFile + ". Não foi possível guardar o caminho para a próxima inicialização: " + e.getMessage()); }
+    }
+    public void closeProject() {
+        if(generationBusy()) return;
+        if(exporter!=null) { message("Aguarde ou cancele a exportação antes de fechar o projeto."); return; }
+        if(projectFile==null && !hasUnsavedChanges()) { message("Nenhum projeto aberto."); return; }
+        if(hasUnsavedChanges() && !confirm("Fechar o projeto e descartar alterações não salvas?")) return;
+        try { lastProject.clear(); }
+        catch(java.io.IOException e) { message("Não foi possível fechar o projeto: " + e.getMessage()); return; }
+        timelineChanged(); audio.close(); project=new VideoProject(); projectFile=null;projectRevision=null;savedProject=null;
+        set("roteiro","");set("efeitoSelecionado",-1);set("selecionada",-1);
+        refreshAudio();refresh();message("Projeto fechado. O editor está vazio.");
+    }
+    private boolean hasUnsavedChanges() {
+        var current=project.snapshot();current.script=text("roteiro");
+        try {
+            current.narration.volume=VideoProject.narrationGainFromPercent(text("volumeNarracao"));
+            current.music.volume=VideoProject.volumeFromPercent(text("volumeMusica"));
+        } catch(IllegalArgumentException e) { return true; }
+        return !new com.google.gson.Gson().toJsonTree(current).equals(
+            new com.google.gson.Gson().toJsonTree(savedProject==null ? new VideoProject() : savedProject));
     }
     public void openProject() { if(generationBusy()) return;
         var files=chooseFiles(FileDialogs.Kind.PROJECT_OPEN); if(files.isEmpty()) return;
@@ -322,7 +475,7 @@ public final class Editor extends ViewScript {
             settingsStore.saveApiKey(legacyKey);settings=settingsStore.load();settingsLoaded=true;
         }
         if(VideoProject.removeLegacyApiKey(absolute,revision)) revision=VideoProject.revision(absolute);
-        timelineChanged(); project=loaded; projectFile=absolute;projectRevision=revision;
+        timelineChanged(); project=loaded; projectFile=absolute;projectRevision=revision;savedProject=loaded.snapshot();
         refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settings.apiKey);
         set("efeitoSelecionado",project.effects.isEmpty() ? -1 : 0);set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }

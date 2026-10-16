@@ -8,7 +8,7 @@ class EditorSettingsTest {
     @Test void defaultsPersistPromptAndSoundsAndProtectPriorPreferencesOnError() throws Exception {
         Path file=folder.resolve("preferences/settings.json");var store=new EditorSettings(file);
         var defaults=store.load();assertEquals(EditorSettings.DEFAULT_SOUNDS,defaults.soundsDirectory);
-        assertTrue(defaults.basePrompt.contains("CANAL DARK DE CURIOSIDADES"));assertTrue(defaults.basePrompt.contains("DIREÇÃO SONORA"));
+        assertTrue(defaults.basePrompt.contains("PRODUTOR DO PROJETO"));assertTrue(defaults.basePrompt.contains("audio.effects"));
         var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.");
         store.save(values);var restored=new EditorSettings(file).load();assertEquals(values.apiKey,restored.apiKey);assertEquals(values.basePrompt,restored.basePrompt);
         assertEquals(folder.toString(),restored.soundsDirectory);assertFalse(values.toString().contains(values.apiKey));
@@ -26,7 +26,7 @@ class EditorSettingsTest {
         store.saveApiKey("dummy-legacy-key");
         var values=store.load();assertEquals("dummy-legacy-key",values.apiKey);
         assertEquals(EditorSettings.DEFAULT_SOUNDS,values.soundsDirectory);
-        assertTrue(values.basePrompt.contains("DIREÇÃO SONORA"));
+        assertTrue(values.basePrompt.contains("audio.effects"));
         if(Files.getFileStore(file).supportsFileAttributeView("posix")) assertEquals("rw-------",java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)));
     }
 }

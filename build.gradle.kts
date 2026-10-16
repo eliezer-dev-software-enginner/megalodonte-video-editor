@@ -19,6 +19,13 @@ application {
     mainClass.set("megalodonte.script.ScriptLauncher")
     applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 }
+distributions {
+    main {
+        contents {
+            from("tools") { into("tools") }
+        }
+    }
+}
 tasks.test { useJUnitPlatform(); jvmArgs("--enable-native-access=ALL-UNNAMED") }
 tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
 

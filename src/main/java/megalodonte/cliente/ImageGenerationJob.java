@@ -18,7 +18,6 @@ final class ImageGenerationJob {
         for(int i=0;i<project.clips.size();i++) if(project.clips.get(i).image.isBlank()) indices.add(i);
         if(project.clips.isEmpty()) throw new IllegalArgumentException("Crie as cenas do roteiro antes de gerar imagens.");
         if(indices.isEmpty()) throw new IllegalArgumentException("Todas as cenas já têm imagem.");
-        if(indices.size()>3) throw new IllegalArgumentException("Nesta etapa de testes, use até três cenas sem imagem por lote.");
         for(int index:indices) if(project.clips.get(index).text.length()>3000) throw new IllegalArgumentException("Para este teste, use textos de cena com até 3000 caracteres.");
         return indices;
     }

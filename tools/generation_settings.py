@@ -24,7 +24,7 @@ def main():
     project_prompt = project_directory / 'prompt-base.md' if project_directory else None
     result = {'soundsDirectory': settings.get('soundsDirectory', '/home/eliezer/Desktop/backup/sounds'),
               'basePrompt': project_prompt.read_text() if project_prompt and project_prompt.is_file()
-              else settings.get('basePrompt', (root / 'docs/prompts/gerar-video.md').read_text())}
+              else settings.get('basePrompt', (root / 'docs/prompts/configurar-projeto-video.md').read_text())}
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

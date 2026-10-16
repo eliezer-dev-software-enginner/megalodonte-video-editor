@@ -22,6 +22,8 @@ class EditorViewTest {
                 var root = (Parent) app.render().getJavaFxNode(); new Scene(root,1320,820); app.onMount();
                 var session = app.current();
                 assertEquals("Configurações",((Button)session.component("settingsButton").getJavaFxNode()).getText());
+                assertEquals("Fechar projeto",((Button)session.component("closeProjectButton").getJavaFxNode()).getText());
+                assertEquals("Aplicar sons",((Button)session.component("applySoundsButton").getJavaFxNode()).getText());
                 assertThrows(IllegalArgumentException.class,()->session.component("openaiKeyInput"));
                 session.invoke("openSettings");
                 var settingsStage=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream()
@@ -31,7 +33,7 @@ class EditorViewTest {
                 var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Diretório de sons e efeitos".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
-                assertTrue(promptField.getText().contains("CANAL DARK DE CURIOSIDADES"));assertTrue(promptField.getText().contains("DIREÇÃO SONORA"));
+                assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
                 folderField.setText("/diretorio-inexistente-para-teste");
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
@@ -55,6 +57,8 @@ class EditorViewTest {
                 session.states().set("volumeMusica","15"); session.states().set("volumeNarracao","80"); session.invoke("applyVolumes");
                 assertTrue(session.states().string("mensagem").get().contains("Volumes aplicados"));
                 assertEquals("Exportar vídeo",((Button)session.component("exportButton").getJavaFxNode()).getText());
+                assertEquals("Sincronizar com whisper",((Button)session.component("syncNarrationButton").getJavaFxNode()).getText());
+                assertTrue(session.component("syncNarrationButton").getJavaFxNode().isDisabled());
                 assertTrue(((Button)session.component("cancelExportButton").getJavaFxNode()).isVisible()==false);
                 var area = (TextArea) session.component("scriptInput").getJavaFxNode();
                 ((Button) session.component("createScenes").getJavaFxNode()).fire(); assertTrue(session.states().string("mensagem").get().contains("obrigatório"));
@@ -66,6 +70,10 @@ class EditorViewTest {
                 var preview = (megalodonte.components.ImagePreview) session.component("preview");
                 assertTrue(preview.hasImage());
                 ((Region)root).resize(1320,820);root.applyCss();root.layout();
+                var previewFrame=(javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst();
+                assertNotNull(previewFrame.getClip(),"The 16:9 preview frame must clip animated image movement");
+                assertEquals(previewFrame.getWidth(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getWidth(),.01);
+                assertEquals(previewFrame.getHeight(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getHeight(),.01);
                 var overlay=(javafx.scene.canvas.Canvas)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().getLast();
                 preview.setVisualEffect("particles",0,0);
                 var first=overlay.snapshot(null,null);preview.setVisualEffect("particles",0,3);
@@ -73,6 +81,10 @@ class EditorViewTest {
                 for(int y=0;y<(int)first.getHeight();y++)for(int x=0;x<(int)first.getWidth();x++)
                     if(first.getPixelReader().getArgb(x,y)!=later.getPixelReader().getArgb(x,y))changed++;
                 assertTrue(changed>0,"Particle overlay must move in the editor preview");
+                var imageNode=(javafx.scene.image.ImageView)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().getFirst();
+                preview.setVisualEffect("smooth",0,0);double initialScale=imageNode.getScaleX();
+                preview.setVisualEffect("smooth",0,3);
+                assertTrue(imageNode.getScaleX()>initialScale);assertNotEquals(0,imageNode.getTranslateX());
                 session.states().set("imagem", "");
                 var timeline = (megalodonte.components.ImageSequence) session.component("timeline"); assertEquals(3,timeline.itemCount());
                 session.states().set("duracao", "8,5"); session.invoke("applyDuration"); assertTrue(session.states().string("resumo").get().contains("18.5"));
@@ -172,12 +184,18 @@ class EditorViewTest {
                     assertEquals("Salvo no projeto restaurado",VideoProject.load(file).script);
                     var saved=VideoProject.load(file);assertEquals(4,saved.effects.size());assertEquals(2.5,saved.effects.get(1).start);assertEquals(.08,saved.effects.get(1).volume);
                     session.invoke("removeEffect");session.invoke("saveProject");assertEquals(3,VideoProject.load(file).effects.size());
+                    session.invoke("closeProject");
+                    assertEquals("",session.states().get("roteiro"));
+                    assertEquals(-1,session.states().get("selecionada"));
+                    assertEquals(true,session.states().get("semCenas"));
+                    assertEquals("Nenhuma música anexada",session.states().get("musicaNome"));
+                    assertTrue(new LastProjectStore().lastSaved().isEmpty());
                 }
                 Files.delete(file);
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     app.render(); app.onMount();
                     assertEquals("",app.current().states().get("roteiro"));
-                    assertTrue(app.current().states().string("mensagem").get().contains("abriu vazio"));
+                    assertTrue(app.current().states().string("mensagem").get().contains("Cole o roteiro"));
                 }
                 return null;
             }); Platform.runLater(restoreCheck); restoreCheck.get(10,TimeUnit.SECONDS);

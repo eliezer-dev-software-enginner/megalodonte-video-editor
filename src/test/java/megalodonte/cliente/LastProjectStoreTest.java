@@ -14,6 +14,8 @@ class LastProjectStoreTest {
         assertEquals(project.toAbsolutePath(),new LastProjectStore(preferences).lastSaved().orElseThrow());
         Path another=directory.resolve("outro.json"); Files.writeString(another,"{}"); store.remember(another);
         assertEquals(another,new LastProjectStore(preferences).lastSaved().orElseThrow());
+        store.clear(); assertTrue(new LastProjectStore(preferences).lastSaved().isEmpty());
+        store.clear();
     }
     @Test void missingSaveNeverReplacesLastRememberedProject() throws Exception {
         var store=new LastProjectStore(directory.resolve("settings.properties")); Path file=directory.resolve("saved.json"); Files.writeString(file,"{}"); store.remember(file);
