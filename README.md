@@ -1,6 +1,6 @@
 # Megalodonte Video Editor
 
-Editor desktop inicial baseado no código do `megalodonte-cliente`, sem copiar o `.git`. A tela é declarada em `src/main/resources/views/editor.view.jsonc`; o script `Editor.java` coordena as ações e `VideoProject.java` mantém o modelo e a persistência. Login e cadastro da base foram preservados como exemplos, mas não fazem parte do fluxo do editor.
+Editor desktop para montar vídeos 16:9 a partir de um roteiro, imagens e áudio locais, com prévia e exportação em MP4. A tela é declarada em `src/main/resources/views/editor.view.jsonc`; o script `Editor.java` coordena as ações e `VideoProject.java` mantém o modelo e a persistência. Login e cadastro da base foram preservados como exemplos, mas não fazem parte do fluxo do editor.
 
 ## Executar
 
@@ -10,7 +10,7 @@ Requer JDK 25 e ambiente gráfico com suporte a JavaFX.
 bash gradlew run
 ```
 
-No Windows: `./run.ps1`. Os projetos irmãos `megalodonte-script-app` e `megalodonte-jsonc-ui` e os módulos do ecossistema são usados automaticamente via composite builds. Os novos componentes precisam desta versão local do JSONC UI; para usar fora do workspace, publique antes as bibliotecas atualizadas em Maven.
+No Windows, há o script `run.ps1`. O build procura `../../framework/megalodonte-declarative/megalodonte-script-app` e o inclui como composite build quando essa pasta existe. Sem ela, a dependência `megalodonte:megalodonte-script-app:0.1.0` precisa estar disponível no Maven local ou em um repositório configurado. As dependências do próprio script app, incluindo componentes JSONC UI, também precisam estar resolvíveis. Este repositório não distribui esses artefatos.
 
 ## Fluxo atual
 
@@ -54,12 +54,12 @@ No painel direito, **Aplicar sons** escolhe uma trilha ambiente na pasta definid
 
 **Exportar vídeo** gera MP4 horizontal em **1920 × 1080, 30 fps**, com vídeo H.264 e áudio AAC estéreo, quando há faixas anexadas. Todas as cenas precisam de uma imagem. Imagens são encaixadas sem distorção, com barras pretas; a duração segue a timeline, com precisão de um frame por cena. Narração é cortada no fim do vídeo ou completada com silêncio; música é repetida e cortada no fim. Os volumes aplicados são usados na mistura.
 
-A exportação requer **FFmpeg instalado e disponível como `ffmpeg` no PATH**. Já está disponível no ambiente utilizado para desenvolver este projeto; não é incorporado ao instalador. FFprobe é usado apenas nos testes. Exportar funciona em segundo plano e permite **Cancelar exportação**. O arquivo final só é substituído quando a renderização termina com sucesso. A exportação usa uma cópia do estado do projeto no momento do clique, portanto alterações posteriores não afetam o vídeo em andamento. Fechar o editor cancela a exportação.
+A exportação requer **FFmpeg instalado e disponível como `ffmpeg` no PATH**. Ele não é incorporado à distribuição. FFprobe é usado apenas nos testes. Exportar funciona em segundo plano e permite **Cancelar exportação**. O arquivo final só é substituído quando a renderização termina com sucesso. A exportação usa uma cópia do estado do projeto no momento do clique, portanto alterações posteriores não afetam o vídeo em andamento. Fechar o editor cancela a exportação.
 
 ## Verificação e distribuição
 
 ```bash
-bash gradlew test :megalodonte-jsonc-ui:test :megalodonte-script-app:test
+bash gradlew test
 bash gradlew installDist
 ```
 
@@ -97,10 +97,10 @@ Essa tarefa chama a API real; não faz parte dos testes comuns. Para um destino 
 bash gradlew imageIntegrationSmoke -PscriptFile=examples/roteiro-uma-cena.txt -PprojectOutput=projects/meu-teste/projeto.mvideo.json
 ```
 
-O projeto real de duas cenas validado em 9 de outubro de 2026 foi preservado em `projects/openai-real-20261009/projeto.mvideo.json`. Abra esse manifesto pelo botão **Abrir projeto** ou execute:
+Os arquivos em `projects/` são locais e ignorados pelo Git; um clone novo não contém o projeto usado na validação de 9 de outubro de 2026. Depois de gerar um projeto com a tarefa acima, abra o manifesto pelo botão **Abrir projeto** ou execute, ajustando o caminho ao arquivo criado:
 
 ```bash
-bash gradlew run -PinitialProject=projects/openai-real-20261009/projeto.mvideo.json
+bash gradlew run -PinitialProject=projects/meu-teste/projeto.mvideo.json
 ```
 
 `initialProject` abre o arquivo uma vez, sem trocar a preferência do último projeto salvo até que você salve. A pasta `projects/` é ignorada pelo Git para preservar os artefatos locais sem versionar imagens grandes.
@@ -108,7 +108,7 @@ bash gradlew run -PinitialProject=projects/openai-real-20261009/projeto.mvideo.j
 Para renderizar e verificar um projeto gerado, sem novas chamadas à API:
 
 ```bash
-bash gradlew test --tests '*OpenAiGeneratedProjectUiTest' -PliveProject=projects/openai-real-20261009/projeto.mvideo.json
+bash gradlew test --tests '*OpenAiGeneratedProjectUiTest' -PliveProject=projects/meu-teste/projeto.mvideo.json
 ```
 
 Os testes normais usam um servidor HTTP local com PNGs de teste e não consomem a API. Capturas da integração real ficam em `build/preview/openai-live-scene-1.png` e `openai-live-scene-2.png`.
@@ -136,11 +136,11 @@ O primeiro uso baixa o modelo multilingual `small`; o cache e o ambiente ficam e
 
 O botão **Configurações** abre uma janela com UI declarativa JSONC e scroll Megalodonte. Ela reúne a chave OpenAI oculta, a pasta da biblioteca de sons e o prompt base editável. **Salvar configurações** persiste esses valores em `editor-settings.json` no diretório de preferências do usuário; **Cancelar** não altera os valores salvos. A pasta deve existir e ser legível. No Linux, o arquivo de preferências é gravado com permissões 600. A chave não aparece mais na tela principal.
 
-A biblioteca inicia em `/home/eliezer/Desktop/backup/sounds`. Os prompts foram separados por função. Use [roteirista-conversacional.md](docs/prompts/roteirista-conversacional.md) em qualquer agente que converse sobre tema e duração, pesquise e escreva a narração. O prompt editável nas Configurações agora é [configurar-projeto-video.md](docs/prompts/configurar-projeto-video.md): ele recebe o roteiro pronto e orienta a configuração de cenas, imagens, música e efeitos individuais na timeline, sem reescrever as falas. O padrão embarcado fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
+A biblioteca de sons vem configurada com um caminho local do ambiente de desenvolvimento, que pode não existir em outro computador. Antes de usar **Aplicar sons**, selecione em **Configurações** uma pasta de sons existente e legível. Os prompts foram separados por função. Use [roteirista-conversacional.md](docs/prompts/roteirista-conversacional.md) em qualquer agente que converse sobre tema e duração, pesquise e escreva a narração. O prompt editável nas Configurações agora é [configurar-projeto-video.md](docs/prompts/configurar-projeto-video.md): ele recebe o roteiro pronto e orienta a configuração de cenas, imagens, música e efeitos individuais na timeline, sem reescrever as falas. O padrão embarcado fica em `src/main/resources/prompts/base-video.md`. Alterações feitas na janela são preservadas entre reinicializações. **Restaurar prompt padrão** apenas repõe o campo; ainda é necessário salvar para persistir.
 
 O agente de produção pode executar `python3 tools/generation_settings.py` para consultar a pasta e o prompt sem imprimir a chave. Os sons devem ser planejados por cena e anexados individualmente em `audio.effects`, preservando a narração e a música existente. O prompt e a biblioteca orientam o agente de produção; o botão de geração de imagens continua solicitando somente imagens, sem disparar produção automática de áudio.
 
-Para continuar um projeto com regras próprias, passe `--project projects/<pasta>/<arquivo>.mvideo.json`. Quando existir `prompt-base.md` ao lado do manifesto, esse prompt substitui o global na saída do comando; a biblioteca de sons continua vindo das Configurações. Os projetos Google/energia nuclear e vídeo 1 do aplicativo de ponto têm prompts próprios com fades (`animateImages: true`) e uso pontual de `shake`.
+Para continuar um projeto com regras próprias, passe `--project projects/<pasta>/<arquivo>.mvideo.json`. Quando existir `prompt-base.md` ao lado do manifesto, esse prompt substitui o global na saída do comando; a biblioteca de sons continua vindo das Configurações. Projetos locais podem ter prompts próprios e configurar fades (`animateImages: true`) e uso pontual de `shake`.
 
 ### Efeitos sonoros na timeline
 
