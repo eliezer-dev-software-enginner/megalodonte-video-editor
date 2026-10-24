@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import java.util.HashMap;
 
 /** Persists only newly selected sound assets, without copying the project's existing (potentially large) images. */
 final class SoundProjectStore {
@@ -28,9 +29,12 @@ final class SoundProjectStore {
         if (additions.musicAdded()) audio.add("music", audioTrack(project.music.file, project.music.volume, absolute, assets));
         JsonArray effects = audio.has("effects") && audio.get("effects").isJsonArray()
                 ? audio.getAsJsonArray("effects") : new JsonArray();
+        var copiedEffects=new HashMap<String,String>();
         for (var effect : additions.effectsAdded()) {
             var json = new com.google.gson.Gson().toJsonTree(effect).getAsJsonObject();
-            json.addProperty("file", copyNewAsset(effect.file, absolute, assets));
+            String saved=copiedEffects.get(effect.file);
+            if(saved==null) { saved=copyNewAsset(effect.file,absolute,assets);copiedEffects.put(effect.file,saved); }
+            json.addProperty("file",saved);
             effects.add(json);
         }
         if (!additions.effectsAdded().isEmpty() || !audio.has("effects")) audio.add("effects", effects);

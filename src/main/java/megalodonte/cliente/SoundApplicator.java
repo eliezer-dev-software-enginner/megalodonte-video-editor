@@ -68,28 +68,30 @@ final class SoundApplicator {
             double start=sceneStart(project,scene),end=start+project.clips.get(scene).duration;
             for(var effect:project.effects) if(effect.start>=start && effect.start<end) { occupied.add(scene);break; }
         }
-        var candidates=new ArrayList<Candidate>();
-        for (int scene = 0; scene < project.clips.size(); scene++) {
-            var clip = project.clips.get(scene);
-            var sceneWords = words(clip.text);
-            double start = sceneStart(project, scene);
-            if(occupied.contains(scene) || project.effects.stream().anyMatch(effect -> Math.abs(effect.start-start)<1.0)) continue;
-            for(Sound sound:sounds) {
-                if(!hasRole(sound,EFFECT_TAGS) || project.effects.stream().anyMatch(effect->sameFile(effect.file,sound.file()))) continue;
-                double relevance=score(sound,sceneWords);
-                if(relevance>=MIN_SCORE)candidates.add(new Candidate(scene,sound,relevance));
-            }
-        }
-        candidates.sort(Comparator.comparingDouble(Candidate::score).reversed()
-                .thenComparingInt(Candidate::scene).thenComparing(candidate->candidate.sound.file().toString()));
         var chosen=new ArrayList<Candidate>();
-        var usedFiles=new HashSet<Path>();
-        for(Candidate candidate:candidates) {
-            if(occupied.size()+chosen.size()>=target)break;
-            if(chosen.stream().anyMatch(value->value.scene==candidate.scene) || !usedFiles.add(candidate.sound.file()))continue;
-            chosen.add(candidate);
+        var effectSounds=sounds.stream().filter(sound->hasRole(sound,EFFECT_TAGS)).toList();
+        var scriptWords=words(project.script+" "+project.clips.stream().map(clip->clip.text).reduce("",(a,b)->a+" "+b));
+        Path previous=null;
+        for(int bucket=0;bucket<target;bucket++) {
+            int first=(int)Math.ceil(bucket*project.clips.size()/(double)target);
+            int end=(int)Math.ceil((bucket+1)*project.clips.size()/(double)target);
+            if(occupied.stream().anyMatch(scene->scene>=first&&scene<end))continue;
+            Candidate best=null;
+            for(int scene=first;scene<end;scene++) {
+                double start=sceneStart(project,scene);
+                if(project.effects.stream().anyMatch(effect->Math.abs(effect.start-start)<1.0))continue;
+                var sceneWords=words(project.clips.get(scene).text);
+                for(Sound sound:effectSounds) {
+                    double local=score(sound,sceneWords),global=score(sound,scriptWords);
+                    if(local<MIN_SCORE && global<MIN_SCORE)continue;
+                    double relevance=local*10+global*.2-(sound.file().equals(previous)?2:0);
+                    var candidate=new Candidate(scene,sound,relevance);
+                    if(best==null || candidate.score>best.score ||
+                            (candidate.score==best.score && candidate.scene<best.scene))best=candidate;
+                }
+            }
+            if(best!=null) { chosen.add(best);previous=best.sound.file(); }
         }
-        chosen.sort(Comparator.comparingInt(Candidate::scene));
         var added = new ArrayList<VideoProject.SoundEffect>();
         for(Candidate candidate:chosen) {
             int scene=candidate.scene;
@@ -173,10 +175,6 @@ final class SoundApplicator {
 
     private static String normalize(String value) {
         return Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT);
-    }
-
-    private static boolean sameFile(String left, Path right) {
-        return !left.isBlank() && Path.of(left).toAbsolutePath().normalize().equals(right.toAbsolutePath().normalize());
     }
 
     private static double sceneStart(VideoProject project, int scene) {

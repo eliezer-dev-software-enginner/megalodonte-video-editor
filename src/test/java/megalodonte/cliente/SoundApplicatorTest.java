@@ -69,6 +69,33 @@ class SoundApplicatorTest {
         assertEquals(0,SoundApplicator.apply(project,library,100).addedCount());
     }
 
+    @Test void reusesRelevantSoundAndDistributesEffectsAcrossTheWholeVideo() throws Exception {
+        Path library=Files.createDirectories(folder.resolve("reusable-sounds"));
+        audio(library,"space-echo.wav");
+        Files.writeString(library.resolve("TXT.txt"),"[space-echo.wav]\n#efeito #espaco\n");
+        var project=VideoProject.fromScript("Introdução.\n\nUm objeto distante.\n\nSinais antigos.\n\nOndas de rádio.\n\nO espaço profundo.\n\nMais observações.\n\nNovos dados.\n\nConclusão.");
+        project.clips.forEach(clip->clip.duration=40);
+        Path manifest=folder.resolve("reusable.mvideo.json");project.save(manifest);
+        String revision=VideoProject.revision(manifest);
+        var additions=SoundApplicator.apply(project,library,100);
+        assertEquals(8,additions.effectsAdded().size());
+        assertTrue(additions.effectsAdded().getFirst().start<40,"opening scene should not be silent");
+        assertTrue(additions.effectsAdded().getLast().start>280,"ending should also have effects");
+        SoundProjectStore.saveAdditions(project,manifest,revision,additions);
+        var saved=VideoProject.load(manifest);
+        assertEquals(8,saved.effects.size());
+        assertEquals(1,saved.effects.stream().map(effect->effect.file).distinct().count(),"reuse one portable asset");
+        try(var assets=Files.list(folder.resolve("reusable.mvideo.json.assets"))) {assertEquals(1,assets.count());}
+        assertEquals(0,SoundApplicator.apply(saved,library,100).effectsAdded().size());
+
+        var sparse=VideoProject.fromScript(project.script);
+        sparse.clips.forEach(clip->clip.duration=40);
+        var quarter=SoundApplicator.apply(sparse,library,25);
+        assertEquals(2,quarter.effectsAdded().size());
+        assertTrue(quarter.effectsAdded().getFirst().start<160);
+        assertTrue(quarter.effectsAdded().getLast().start>=160);
+    }
+
     private static Path audio(Path root,String name) throws Exception {
         Path file=root.resolve(name);Files.writeString(file,"fixture audio");return file;
     }
