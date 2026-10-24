@@ -15,6 +15,9 @@ final class EditorSettings {
         final double pauseCutThreshold;
         final String defaultVisualEffect;
         final double visualEffectStrength;
+        final String whisperModel, whisperLanguage;
+        final int whisperBeamSize, whisperCpuThreads;
+        final boolean whisperVad;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
         }
@@ -23,10 +26,17 @@ final class EditorSettings {
         }
         Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
                String defaultVisualEffect,double visualEffectStrength) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,"small","pt",5,4,true);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
+               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
             this.defaultVisualEffect=defaultVisualEffect;
             this.visualEffectStrength=visualEffectStrength;
+            this.whisperModel=whisperModel;this.whisperLanguage=whisperLanguage;
+            this.whisperBeamSize=whisperBeamSize;this.whisperCpuThreads=whisperCpuThreads;this.whisperVad=whisperVad;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -50,7 +60,12 @@ final class EditorSettings {
             validateVisualEffect(effect);
             double strength=json.has("visualEffectStrength") ? json.get("visualEffectStrength").getAsDouble() : 1.0;
             VideoProject.validateVisualEffectStrength(strength);
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength);
+            String model=value(json,"whisperModel","small"),language=value(json,"whisperLanguage","pt");
+            int beam=json.has("whisperBeamSize")?json.get("whisperBeamSize").getAsInt():5;
+            int threads=json.has("whisperCpuThreads")?json.get("whisperCpuThreads").getAsInt():4;
+            boolean vad=json.has("whisperVad")?json.get("whisperVad").getAsBoolean():true;
+            validateWhisper(model,language,beam,threads);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad);
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
@@ -59,13 +74,16 @@ final class EditorSettings {
         validatePauseCutThreshold(values.pauseCutThreshold);
         validateVisualEffect(values.defaultVisualEffect);
         VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
+        validateWhisper(values.whisperModel,values.whisperLanguage,values.whisperBeamSize,values.whisperCpuThreads);
         write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold,
-                values.defaultVisualEffect,values.visualEffectStrength));
+                values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
+                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
         var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold,
-                current.defaultVisualEffect,current.visualEffectStrength));
+                current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
+                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
@@ -74,6 +92,9 @@ final class EditorSettings {
         json.addProperty("pauseCutThreshold",values.pauseCutThreshold);
         json.addProperty("defaultVisualEffect",values.defaultVisualEffect);
         json.addProperty("visualEffectStrength",values.visualEffectStrength);
+        json.addProperty("whisperModel",values.whisperModel);json.addProperty("whisperLanguage",values.whisperLanguage);
+        json.addProperty("whisperBeamSize",values.whisperBeamSize);json.addProperty("whisperCpuThreads",values.whisperCpuThreads);
+        json.addProperty("whisperVad",values.whisperVad);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
@@ -106,6 +127,19 @@ final class EditorSettings {
     static double parseVisualEffectStrength(String value) {
         try { return VideoProject.validateVisualEffectStrength(Double.parseDouble(value.strip().replace(',','.'))); }
         catch(NumberFormatException e) { throw new IllegalArgumentException("Informe intensidade visual entre 0,25 e 3."); }
+    }
+    static void validateWhisper(String model,String language,int beam,int threads) {
+        if(!java.util.Set.of("tiny","base","small","medium","large-v3").contains(model))
+            throw new IllegalArgumentException("Escolha um modelo Whisper válido.");
+        if(!java.util.Set.of("pt","auto").contains(language))
+            throw new IllegalArgumentException("Escolha português ou detecção automática de idioma.");
+        if(beam<1 || beam>10) throw new IllegalArgumentException("A busca do Whisper deve ficar entre 1 e 10.");
+        if(threads<1 || threads>16) throw new IllegalArgumentException("As threads do Whisper devem ficar entre 1 e 16.");
+    }
+    static int parseWhisperNumber(String value,String name,int min,int max) {
+        try { int number=Integer.parseInt(value.strip());if(number>=min&&number<=max)return number; }
+        catch(NumberFormatException ignored) { }
+        throw new IllegalArgumentException(name+" deve ficar entre "+min+" e "+max+".");
     }
     private static String value(JsonObject json,String name,String fallback) {
         return json.has(name) && !json.get(name).isJsonNull() ? json.get(name).getAsString() : fallback;

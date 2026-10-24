@@ -22,7 +22,9 @@ public final class Editor extends ViewScript {
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
         settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,
                 settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
-                project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength),values -> {
+                project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
+                settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
+                settings.whisperCpuThreads,settings.whisperVad),values -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             if(!project.clips.isEmpty()) {
                 project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
@@ -100,7 +102,7 @@ public final class Editor extends ViewScript {
             project.save(projectFile,projectRevision);
             projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();
             pausePlayback();
-            whisperSync=new WhisperSync(projectFile,settings.pauseCutThreshold);
+            whisperSync=new WhisperSync(projectFile,settings);
         } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage()); return; }
         var sync=whisperSync;var targetProject=project;var targetFile=projectFile;
         whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()-> {

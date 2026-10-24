@@ -17,17 +17,26 @@ final class WhisperSync {
     private final Path scriptsRoot;
     private final Path python;
     private final double pauseCutThreshold;
+    private final String model, language;
+    private final int beamSize, cpuThreads;
+    private final boolean vad;
     private volatile Process activeProcess;
 
-    WhisperSync(Path project,double pauseCutThreshold) throws IOException {
+    WhisperSync(Path project,EditorSettings.Values settings) throws IOException {
         this.project = project.toAbsolutePath().normalize();
-        this.pauseCutThreshold=EditorSettings.validatePauseCutThreshold(pauseCutThreshold);
+        this.pauseCutThreshold=EditorSettings.validatePauseCutThreshold(settings.pauseCutThreshold);
+        EditorSettings.validateWhisper(settings.whisperModel,settings.whisperLanguage,
+                settings.whisperBeamSize,settings.whisperCpuThreads);
+        this.model=settings.whisperModel;this.language=settings.whisperLanguage;
+        this.beamSize=settings.whisperBeamSize;this.cpuThreads=settings.whisperCpuThreads;this.vad=settings.whisperVad;
         this.scriptsRoot = findScriptsRoot();
         this.python = findPython(scriptsRoot);
     }
 
     void run(Consumer<String> progress) throws IOException, InterruptedException {
-        execute(List.of(python.toString(), scriptsRoot.resolve("tools/transcribe_narration.py").toString(), project.toString()),
+        execute(List.of(python.toString(), scriptsRoot.resolve("tools/transcribe_narration.py").toString(), project.toString(),
+                        "--model",model,"--language",language,"--beam-size",Integer.toString(beamSize),
+                        "--cpu-threads",Integer.toString(cpuThreads),"--vad",Boolean.toString(vad)),
                 progress, "Whisper falhou ao transcrever o áudio.");
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/sync_narration.py").toString(), project.toString(),
                         "--pause-cut-threshold",Double.toString(pauseCutThreshold),"--apply"),

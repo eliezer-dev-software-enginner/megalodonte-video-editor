@@ -30,6 +30,14 @@
       "type": "string",
       "initial": "1.0"
     },
+    "whisperModel": { "type": "string", "initial": "small" },
+    "whisperModelOptions": { "type": "string", "initial": "[]" },
+    "whisperLanguage": { "type": "string", "initial": "pt" },
+    "whisperLanguageOptions": { "type": "string", "initial": "[]" },
+    "whisperBeamSize": { "type": "string", "initial": "5" },
+    "whisperCpuThreads": { "type": "string", "initial": "4" },
+    "whisperVad": { "type": "string", "initial": "true" },
+    "whisperVadOptions": { "type": "string", "initial": "[]" },
     "mensagem": {
       "type": "string",
       "initial": ""
@@ -152,6 +160,18 @@
                 "type": "Text",
                 "props": { "text": "1 mantém o movimento atual. Este valor é salvo no projeto para que a exportação reproduza a prévia.", "wrapWidth": 640 }
               },
+              { "type": "Text", "style": { "fontSize": 18 }, "props": { "text": "Transcrição local com Whisper" } },
+              { "type": "Text", "props": { "text": "Modelo" } },
+              { "type": "Select", "id": "whisperModelInput", "props": { "width": 260, "height": 36 }, "bind": { "value": "whisperModel", "items": "whisperModelOptions" } },
+              { "type": "Text", "props": { "text": "Idioma" } },
+              { "type": "Select", "id": "whisperLanguageInput", "props": { "width": 260, "height": 36 }, "bind": { "value": "whisperLanguage", "items": "whisperLanguageOptions" } },
+              { "type": "Text", "props": { "text": "Busca (1 a 10 hipóteses)" } },
+              { "type": "Input", "id": "whisperBeamSizeInput", "props": { "width": 150, "height": 36, "placeholder": "5" }, "bind": { "value": "whisperBeamSize" } },
+              { "type": "Text", "props": { "text": "Threads de CPU (1 a 16)" } },
+              { "type": "Input", "id": "whisperCpuThreadsInput", "props": { "width": 150, "height": 36, "placeholder": "4" }, "bind": { "value": "whisperCpuThreads" } },
+              { "type": "Text", "props": { "text": "Filtro de silêncio (VAD)" } },
+              { "type": "Select", "id": "whisperVadInput", "props": { "width": 200, "height": 36 }, "bind": { "value": "whisperVad", "items": "whisperVadOptions" } },
+              { "type": "Text", "props": { "text": "Modelos maiores podem exigir mais memória e download na primeira execução.", "wrapWidth": 640 } },
               {
                 "type": "Text",
                 "props": {

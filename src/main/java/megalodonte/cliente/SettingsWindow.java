@@ -23,7 +23,11 @@ final class SettingsWindow implements AutoCloseable {
                     view.states().string("basePrompt").get(),
                     EditorSettings.parsePauseCutThreshold(view.states().string("pauseCutThreshold").get()),
                     EditorSettings.validateVisualEffect(view.states().string("defaultVisualEffect").get()),
-                    EditorSettings.parseVisualEffectStrength(view.states().string("visualEffectStrength").get()));
+                    EditorSettings.parseVisualEffectStrength(view.states().string("visualEffectStrength").get()),
+                    view.states().string("whisperModel").get(),view.states().string("whisperLanguage").get(),
+                    EditorSettings.parseWhisperNumber(view.states().string("whisperBeamSize").get(),"A busca do Whisper",1,10),
+                    EditorSettings.parseWhisperNumber(view.states().string("whisperCpuThreads").get(),"As threads do Whisper",1,16),
+                    Boolean.parseBoolean(view.states().string("whisperVad").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected);stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -43,6 +47,13 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
         session.states().set("defaultVisualEffect",values.defaultVisualEffect);
         session.states().set("visualEffectStrength",Double.toString(values.visualEffectStrength));
+        session.states().set("whisperModelOptions","[{\"value\":\"tiny\",\"label\":\"Tiny (rápido)\"},{\"value\":\"base\",\"label\":\"Base\"},{\"value\":\"small\",\"label\":\"Small (padrão)\"},{\"value\":\"medium\",\"label\":\"Medium\"},{\"value\":\"large-v3\",\"label\":\"Large v3 (mais pesado)\"}]");
+        session.states().set("whisperLanguageOptions","[{\"value\":\"pt\",\"label\":\"Português\"},{\"value\":\"auto\",\"label\":\"Detectar automaticamente\"}]");
+        session.states().set("whisperVadOptions","[{\"value\":\"true\",\"label\":\"Ligado\"},{\"value\":\"false\",\"label\":\"Desligado\"}]");
+        session.states().set("whisperModel",values.whisperModel);session.states().set("whisperLanguage",values.whisperLanguage);
+        session.states().set("whisperBeamSize",Integer.toString(values.whisperBeamSize));
+        session.states().set("whisperCpuThreads",Integer.toString(values.whisperCpuThreads));
+        session.states().set("whisperVad",Boolean.toString(values.whisperVad));
         stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),760,680));
         stage.setMinWidth(740);stage.setMinHeight(520);
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
