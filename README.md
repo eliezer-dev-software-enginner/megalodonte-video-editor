@@ -10,7 +10,7 @@ Requer JDK 25 e ambiente gráfico com suporte a JavaFX.
 bash gradlew run
 ```
 
-No Windows, há o script `run.ps1`. O build procura `../../framework/megalodonte-declarative/megalodonte-script-app` e o inclui como composite build quando essa pasta existe. Sem ela, a dependência `megalodonte:megalodonte-script-app:0.1.0` precisa estar disponível no Maven local ou em um repositório configurado. As dependências do próprio script app, incluindo componentes JSONC UI, também precisam estar resolvíveis. Este repositório não distribui esses artefatos.
+No Windows, execute `./run.ps1` no PowerShell. O build procura `../../framework/megalodonte-declarative/megalodonte-script-app` e o inclui como composite build quando essa pasta existe. Sem ela, a dependência `megalodonte:megalodonte-script-app:0.1.0` precisa estar disponível no Maven local ou em um repositório configurado. As dependências do próprio script app, incluindo componentes JSONC UI, também precisam estar resolvíveis. Este repositório não distribui esses artefatos.
 
 ## Fluxo atual
 
@@ -67,7 +67,7 @@ bash gradlew test
 bash gradlew installDist
 ```
 
-Os testes do editor verificam separação do roteiro, portabilidade das imagens e áudios, volumes, leitura de projetos inválidos, exportação real e ações da UI, gerando capturas em `build/preview/`. Os testes JavaFX exigem ambiente gráfico. Os testes de exportação usam FFmpeg/FFprobe e são ignorados quando FFmpeg não está instalado. A distribuição fica em `build/install/megalodonte-video-editor` e requer Java 25.
+Os testes do editor verificam separação do roteiro, portabilidade das imagens e áudios, volumes, leitura de projetos inválidos, exportação real e ações da UI, gerando capturas em `build/preview/`. Os testes JavaFX exigem ambiente gráfico. Os testes de exportação são ignorados quando `ffmpeg` não está disponível; se `ffmpeg` estiver disponível, também é necessário ter `ffprobe` no PATH para esses testes. A distribuição fica em `build/install/megalodonte-video-editor` e requer Java 25.
 
 Detalhes e decisões: [arquitetura](docs/arquitetura.md).
 
