@@ -20,9 +20,16 @@ public final class Editor extends ViewScript {
         if(generationBusy()) return;
         pausePlayback();
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
-        settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,settings.basePrompt,settings.pauseCutThreshold),values -> {
+        settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,
+                settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
+                project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength),values -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
-            message("Configurações salvas. Prompt base e biblioteca de sons disponíveis para a geração de vídeo.");
+            if(!project.clips.isEmpty()) {
+                project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
+                if(projectFile!=null)saveProject();
+            }
+            if(project.clips.isEmpty())syncMotionSelection();
+            if(projectFile==null)message("Configurações salvas. Salve o projeto para manter sua intensidade visual.");
         });
         settingsWindow.show();
     }
@@ -308,7 +315,7 @@ public final class Editor extends ViewScript {
     private void refreshVisualPreview() {
         int selected=index();var clip=selected();if(clip==null)return;
         double start=0;for(int i=0;i<selected;i++)start+=project.clips.get(i).duration;
-        ((ImagePreview)component("preview")).setVisualEffect(clip.visualEffect,selected,playhead-start);
+        ((ImagePreview)component("preview")).setVisualEffect(clip.visualEffect,selected,playhead-start,project.visualEffectStrength);
     }
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
@@ -317,7 +324,7 @@ public final class Editor extends ViewScript {
             Map.of("value","none","label","Nenhum"),Map.of("value","smooth","label","Movimento suave"),
             Map.of("value","particles","label","Partículas"),Map.of("value","shake","label","Tremor leve"),
             Map.of("value","custom","label","Personalizado por cena"))));
-        try { settings=settingsStore.load();settingsLoaded=settingsStore.exists();set("openaiKey",settings.apiKey); }
+        try { settings=settingsStore.load();settingsLoaded=settingsStore.exists();set("openaiKey",settings.apiKey);project.visualEffectStrength=settings.visualEffectStrength; }
         catch(java.io.IOException e) { message("Não foi possível carregar as configurações: "+e.getMessage()); }
         refreshAudio(); refresh();
         try {
@@ -341,6 +348,7 @@ public final class Editor extends ViewScript {
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
         timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = VideoProject.fromScript(text("roteiro")); project.animateImages=previous.animateImages;
+        project.visualEffectStrength=previous.visualEffectStrength;
         if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
         project.music.file=previous.music.file; project.music.volume=previous.music.volume;project.effects.addAll(previous.effects);audio.load(project,this::audioError); set("selecionada", project.clips.isEmpty() ? -1 : 0); refresh();
@@ -360,7 +368,7 @@ public final class Editor extends ViewScript {
         refreshEffects();set("timeline", project.timeline()); set("resumo", project.clips.size() + " cenas · " + String.format(Locale.ROOT, "%.1f segundos", project.duration())); refreshSelection();
     }
     private String selectedMotionForProject() {
-        if(project.clips.isEmpty()) return project.animateImages ? "smooth" : "none";
+        if(project.clips.isEmpty()) return project.animateImages ? "smooth" : settings.defaultVisualEffect;
         String first=project.clips.getFirst().visualEffect;
         if(project.clips.stream().anyMatch(clip->!Objects.equals(first,clip.visualEffect))) return "custom";
         if(first.isBlank() && project.animateImages) return "smooth";
@@ -391,7 +399,11 @@ public final class Editor extends ViewScript {
                 for(int i=0;i<Math.min(plan.size(),target.clips.size());i++)target.clips.get(i).visualEffect=switch(plan.get(i)){case "smooth","particles","shake"->plan.get(i);default->"";};
                 target.animateImages=false;motionEffectApplying=false;set("motionEffectBusy",false);refresh();
                 String label=switch(effect) { case "smooth"->"Movimento suave";case "particles"->"Partículas";case "shake"->"Tremor leve";default->"Nenhum efeito"; };
-                message(label+" aplicado a todas as "+count+" imagens. Salve o projeto para manter a alteração.");
+                if(projectFile!=null) {
+                    String before=projectRevision;
+                    saveProject();
+                    if(!Objects.equals(before,projectRevision))message(label+" aplicado e projeto salvo com "+count+" imagens.");
+                } else message(label+" aplicado a todas as "+count+" imagens. Salve o projeto para manter a alteração.");
             });
         });
     }
@@ -464,7 +476,8 @@ public final class Editor extends ViewScript {
         if(hasUnsavedChanges() && !confirm("Fechar o projeto e descartar alterações não salvas?")) return;
         try { lastProject.clear(); }
         catch(java.io.IOException e) { message("Não foi possível fechar o projeto: " + e.getMessage()); return; }
-        timelineChanged(); audio.close(); project=new VideoProject(); projectFile=null;projectRevision=null;savedProject=null;
+        timelineChanged(); audio.close(); project=new VideoProject();project.visualEffectStrength=settings.visualEffectStrength;
+        projectFile=null;projectRevision=null;savedProject=null;
         set("roteiro","");set("efeitoSelecionado",-1);set("selecionada",-1);
         refreshAudio();refresh();message("Projeto fechado. O editor está vazio.");
     }

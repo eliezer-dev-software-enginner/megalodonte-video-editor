@@ -45,10 +45,13 @@ class VideoProjectTest {
         assertThrows(IllegalArgumentException.class,()->VideoProject.validateVisualEffect("snow"));
     }
     @Test void smoothMotionCueSurvivesSaveAndSnapshot() throws Exception {
-        var project=VideoProject.fromScript("Abertura");project.clips.getFirst().visualEffect="smooth";
+        var project=VideoProject.fromScript("Abertura");project.clips.getFirst().visualEffect="smooth";project.visualEffectStrength=1.7;
         assertEquals("smooth",project.snapshot().clips.getFirst().visualEffect);
+        assertEquals(1.7,project.snapshot().visualEffectStrength);
         var file=directory.resolve("smooth.json");project.save(file);
         assertEquals("smooth",VideoProject.load(file).clips.getFirst().visualEffect);
+        assertEquals(1.7,VideoProject.load(file).visualEffectStrength);
+        assertThrows(IllegalArgumentException.class,()->VideoProject.validateVisualEffectStrength(3.1));
     }
     @Test void staleEditorCannotOverwriteExternallyUpdatedManifest() throws Exception {
         var file=directory.resolve("shared.mvideo.json");var first=VideoProject.fromScript("Versão inicial");first.save(file);

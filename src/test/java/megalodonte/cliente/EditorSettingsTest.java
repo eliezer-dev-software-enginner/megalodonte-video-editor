@@ -10,9 +10,10 @@ class EditorSettingsTest {
         var defaults=store.load();assertEquals(EditorSettings.DEFAULT_SOUNDS,defaults.soundsDirectory);
         assertEquals(1.0,defaults.pauseCutThreshold);
         assertTrue(defaults.basePrompt.contains("PRODUTOR DO PROJETO"));assertTrue(defaults.basePrompt.contains("audio.effects"));
-        var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.",1.8);
+        var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.",1.8,"smooth",1.6);
         store.save(values);var restored=new EditorSettings(file).load();assertEquals(values.apiKey,restored.apiKey);assertEquals(values.basePrompt,restored.basePrompt);
         assertEquals(1.8,restored.pauseCutThreshold);
+        assertEquals("smooth",restored.defaultVisualEffect);assertEquals(1.6,restored.visualEffectStrength);
         assertEquals(folder.toString(),restored.soundsDirectory);assertFalse(values.toString().contains(values.apiKey));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.resolve("missing").toString(),"Prompt")));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.toString()," ")));
@@ -20,6 +21,8 @@ class EditorSettingsTest {
         assertThrows(IllegalArgumentException.class,()->EditorSettings.parsePauseCutThreshold("31"));
         assertEquals(1.5,EditorSettings.parsePauseCutThreshold("1,5"));
         assertEquals(values.basePrompt,store.load().basePrompt);
+        assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.toString(),"Prompt",1,"invalid",1)));
+        assertThrows(IllegalArgumentException.class,()->EditorSettings.parseVisualEffectStrength("3.1"));
         if(Files.getFileStore(file).supportsFileAttributeView("posix")) assertEquals("rw-------",java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)));
     }
     @Test void malformedPreferencesNeverEchoStoredContent() throws Exception {
@@ -40,5 +43,7 @@ class EditorSettingsTest {
         Path file=folder.resolve("settings.json");
         Files.writeString(file,"{\"soundsDirectory\":\""+folder.toString().replace("\\","\\\\")+"\",\"basePrompt\":\"Prompt\"}");
         assertEquals(1.0,new EditorSettings(file).load().pauseCutThreshold);
+        assertEquals("none",new EditorSettings(file).load().defaultVisualEffect);
+        assertEquals(1.0,new EditorSettings(file).load().visualEffectStrength);
     }
 }

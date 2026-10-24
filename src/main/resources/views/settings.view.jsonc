@@ -18,6 +18,18 @@
       "type": "string",
       "initial": "1.0"
     },
+    "defaultVisualEffect": {
+      "type": "string",
+      "initial": "none"
+    },
+    "visualEffectOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
+    "visualEffectStrength": {
+      "type": "string",
+      "initial": "1.0"
+    },
     "mensagem": {
       "type": "string",
       "initial": ""
@@ -115,6 +127,30 @@
                   "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
                   "wrapWidth": 640
                 }
+              },
+              {
+                "type": "Text",
+                "props": { "text": "Efeito visual padrão para cenas novas" }
+              },
+              {
+                "type": "Select",
+                "id": "defaultVisualEffectInput",
+                "props": { "width": 240, "height": 36 },
+                "bind": { "value": "defaultVisualEffect", "items": "visualEffectOptions" }
+              },
+              {
+                "type": "Text",
+                "props": { "text": "Intensidade dos efeitos visuais (0,25 a 3)" }
+              },
+              {
+                "type": "Input",
+                "id": "visualEffectStrengthInput",
+                "props": { "width": 150, "height": 36, "placeholder": "Ex.: 1,5" },
+                "bind": { "value": "visualEffectStrength" }
+              },
+              {
+                "type": "Text",
+                "props": { "text": "1 mantém o movimento atual. Este valor é salvo no projeto para que a exportação reproduza a prévia.", "wrapWidth": 640 }
               },
               {
                 "type": "Text",

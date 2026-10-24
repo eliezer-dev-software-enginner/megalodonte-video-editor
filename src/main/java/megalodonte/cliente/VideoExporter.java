@@ -17,6 +17,7 @@ public final class VideoExporter {
     public void cancel() { cancelled=true; var running=process; if(running!=null) running.destroyForcibly(); }
     public void export(VideoProject project, Path output, Consumer<String> progress) throws IOException {
         if(project.clips.isEmpty()) throw new IOException("Crie cenas e anexe as imagens antes de exportar.");
+        VideoProject.validateVisualEffectStrength(project.visualEffectStrength);
         Path target=output.toAbsolutePath().normalize();
         for(var clip:project.clips) {
             if(clip.image.isBlank() || !Files.isRegularFile(Path.of(clip.image))) throw new IOException("Anexe uma imagem para cada cena antes de exportar.");
@@ -56,12 +57,14 @@ public final class VideoExporter {
                 }
                 if(clip.visualEffect.equals("smooth")) {
                     String frameProgress="on/"+Math.max(1,frames-1);
+                    double strength=project.visualEffectStrength;
                     filter="scale="+(width*2)+":"+(height*2)+":force_original_aspect_ratio=increase,crop="+(width*2)+":"+(height*2)
-                        +",zoompan=z='1+0.035*"+frameProgress+"':x='iw/2-iw/zoom/2+sin(on*0.025)*iw*0.002':y='ih/2-ih/zoom/2+(cos(on*0.021)-1)*ih*0.0015':d=1:s="+width+"x"+height+":fps=30,setsar=1";
+                        +",zoompan=z='1+"+(0.035*strength)+"*"+frameProgress+"':x='iw/2-iw/zoom/2+sin(on*0.025)*iw*"+(0.002*strength)+"':y='ih/2-ih/zoom/2+(cos(on*0.021)-1)*ih*"+(0.0015*strength)+"':d=1:s="+width+"x"+height+":fps=30,setsar=1";
                 }
-                if(clip.visualEffect.equals("particles")) filter+=particleFilter(i);
+                if(clip.visualEffect.equals("particles")) filter+=particleFilter(i,project.visualEffectStrength);
                 if(clip.visualEffect.equals("shake")) {
-                    int marginX=Math.max(2,(int)Math.round(width/120.0))*2, marginY=Math.max(2,(int)Math.round(height/120.0))*2;
+                    int marginX=Math.max(2,(int)Math.round(width/120.0*project.visualEffectStrength))*2,
+                        marginY=Math.max(2,(int)Math.round(height/120.0*project.visualEffectStrength))*2;
                     filter+=",crop="+(width-marginX)+":"+(height-marginY)
                         +":x='"+(marginX/2)+"+"+(marginX/4)+"*sin(n*0.31)':y='"+(marginY/2)+"+"+(marginY/4)+"*cos(n*0.27)',scale="+width+":"+height+",setsar=1";
                 }
@@ -112,9 +115,9 @@ public final class VideoExporter {
         if(output.equals(input) || (Files.exists(output) && Files.isSameFile(output,input))) throw new IOException("Escolha um arquivo de saída diferente dos assets do projeto.");
     }
     /** Sparse, deterministic drifting lights; kept away from a central portrait in the opening. */
-    private String particleFilter(int scene) {
+    private String particleFilter(int scene,double strength) {
         var result=new StringBuilder();var random=new Random(0x5eedL+scene);
-        for(int i=0;i<26;i++) {
+        for(int i=0;i<Math.max(1,Math.round(26*strength));i++) {
             int x=scene==0 ? (i%2==0 ? random.nextInt(width/4) : width*3/4+random.nextInt(width/4)) : random.nextInt(width);
             int y=random.nextInt(height), speed=8+random.nextInt(20), size=14+random.nextInt(11);
             result.append(",drawtext=text='·':fontcolor=white@0.5:fontsize=").append(size)

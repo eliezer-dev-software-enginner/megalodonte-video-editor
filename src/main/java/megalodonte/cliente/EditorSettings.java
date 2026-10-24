@@ -13,12 +13,20 @@ final class EditorSettings {
     static final class Values {
         final String apiKey, soundsDirectory, basePrompt;
         final double pauseCutThreshold;
+        final String defaultVisualEffect;
+        final double visualEffectStrength;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
         }
         Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,"none",1.0);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
+            this.defaultVisualEffect=defaultVisualEffect;
+            this.visualEffectStrength=visualEffectStrength;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -38,24 +46,34 @@ final class EditorSettings {
             var json=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
             double threshold=json.has("pauseCutThreshold") ? json.get("pauseCutThreshold").getAsDouble() : DEFAULT_PAUSE_CUT_THRESHOLD;
             validatePauseCutThreshold(threshold);
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold);
+            String effect=value(json,"defaultVisualEffect","none");
+            validateVisualEffect(effect);
+            double strength=json.has("visualEffectStrength") ? json.get("visualEffectStrength").getAsDouble() : 1.0;
+            VideoProject.validateVisualEffectStrength(strength);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength);
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
         Path directory=validateSounds(values.soundsDirectory);
         if(values.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
         validatePauseCutThreshold(values.pauseCutThreshold);
-        write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold));
+        validateVisualEffect(values.defaultVisualEffect);
+        VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
+        write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold,
+                values.defaultVisualEffect,values.visualEffectStrength));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
-        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold));
+        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold,
+                current.defaultVisualEffect,current.visualEffectStrength));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
         var json=new JsonObject(); json.addProperty("openaiApiKey",values.apiKey.strip());
         json.addProperty("soundsDirectory",values.soundsDirectory); json.addProperty("basePrompt",values.basePrompt);
         json.addProperty("pauseCutThreshold",values.pauseCutThreshold);
+        json.addProperty("defaultVisualEffect",values.defaultVisualEffect);
+        json.addProperty("visualEffectStrength",values.visualEffectStrength);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
@@ -79,6 +97,15 @@ final class EditorSettings {
         if(!Double.isFinite(value) || value<.1 || value>30)
             throw new IllegalArgumentException("A pausa mínima deve ficar entre 0,1 e 30 segundos.");
         return value;
+    }
+    static String validateVisualEffect(String value) {
+        if(!java.util.Set.of("none","smooth","particles","shake").contains(value))
+            throw new IllegalArgumentException("Escolha um efeito visual válido.");
+        return value;
+    }
+    static double parseVisualEffectStrength(String value) {
+        try { return VideoProject.validateVisualEffectStrength(Double.parseDouble(value.strip().replace(',','.'))); }
+        catch(NumberFormatException e) { throw new IllegalArgumentException("Informe intensidade visual entre 0,25 e 3."); }
     }
     private static String value(JsonObject json,String name,String fallback) {
         return json.has(name) && !json.get(name).isJsonNull() ? json.get(name).getAsString() : fallback;

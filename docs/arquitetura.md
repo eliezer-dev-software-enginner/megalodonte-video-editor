@@ -1,5 +1,9 @@
 # Arquitetura e evolução
 
+## Efeitos visuais e restauração
+
+As Configurações guardam o efeito padrão para novas cenas (`none`, `smooth`, `particles` ou `shake`) e a intensidade visual entre 0,25 e 3. O manifesto do projeto guarda o efeito de cada cena e a intensidade usada nele; projetos antigos sem esse campo usam intensidade 1. A prévia e o FFmpeg usam a mesma intensidade. Ao abrir um projeto, a seleção do efeito é reconstruída das cenas, mesmo que o padrão atual nas Configurações seja outro. Aplicar um efeito a todas as cenas salva automaticamente o projeto já aberto; em um projeto novo, é preciso usar Salvar projeto. No instante inicial de uma cena, o movimento suave ainda está em seu quadro inicial; reproduza a prévia para observá-lo.
+
 ## Etapa inicial — 8 de outubro de 2026
 
 A base foi copiada do `megalodonte-cliente`. Código, recursos, wrapper Gradle e scripts de distribuição foram preservados; metadados Git, caches, outputs de compilação e arquivos locais da IDE não foram copiados. Nome do projeto, identificação do pacote e UUID do instalador foram alterados. Os testes de login da cópia foram substituídos por testes do editor; os exemplos de login e cadastro permanecem disponíveis.

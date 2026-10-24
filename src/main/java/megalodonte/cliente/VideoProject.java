@@ -63,6 +63,7 @@ public final class VideoProject {
     }
     public VideoProject snapshot() {
         var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
+        copy.visualEffectStrength = visualEffectStrength;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
         for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
@@ -72,6 +73,8 @@ public final class VideoProject {
     public static final String ASPECT_RATIO = "16:9";
     public String script = "";
     public boolean animateImages;
+    /** Shared intensity for visual effects; stored with the project so exports are reproducible. */
+    public double visualEffectStrength = 1.0;
     public final List<Clip> clips = new ArrayList<>();
     public static VideoProject fromScript(String script) {
         var project = new VideoProject(); project.script = script;
@@ -104,6 +107,8 @@ public final class VideoProject {
             validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
+        validateVisualEffectStrength(visualEffectStrength);
+        root.addProperty("visualEffectStrength", visualEffectStrength);
         var audio = new JsonObject();
         audio.add("narration", audioJson(narration,absolute,assets,MAX_NARRATION_GAIN));
         audio.add("music", audioJson(music,absolute,assets,1));
@@ -136,6 +141,8 @@ public final class VideoProject {
             if (root.has("aspectRatio") && !ASPECT_RATIO.equals(root.get("aspectRatio").getAsString())) throw new IllegalArgumentException("Somente vídeos horizontais 16:9 são suportados");
             var project = new VideoProject(); project.script = root.get("script").getAsString();
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
+            if (root.has("visualEffectStrength")) project.visualEffectStrength = root.get("visualEffectStrength").getAsDouble();
+            validateVisualEffectStrength(project.visualEffectStrength);
             for (var element : root.getAsJsonArray("clips")) {
                 var scene = element.getAsJsonObject(); var clip = new Clip(scene.get("text").getAsString());
                 clip.duration = scene.get("duration").getAsDouble();
@@ -213,6 +220,11 @@ public final class VideoProject {
     }
     static void validateVisualEffect(String effect) {
         if(!effect.isBlank() && !effect.equals("particles") && !effect.equals("shake") && !effect.equals("smooth")) throw new IllegalArgumentException("Efeito visual desconhecido: "+effect);
+    }
+    static double validateVisualEffectStrength(double value) {
+        if(!Double.isFinite(value) || value<.25 || value>3)
+            throw new IllegalArgumentException("Intensidade visual deve ficar entre 0,25 e 3.");
+        return value;
     }
     private static String resolveAsset(String name, Path manifest) {
         if (name.isBlank()) return "";

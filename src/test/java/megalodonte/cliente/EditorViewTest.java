@@ -160,6 +160,8 @@ class EditorViewTest {
             Platform.runLater(playbackCheck); playbackCheck.get(10,TimeUnit.SECONDS).get(10,TimeUnit.SECONDS);
             var restoreCheck=new FutureTask<Void>(() -> {
                 var stored=VideoProject.fromScript("Roteiro restaurado\n\nSegunda cena"); stored.music.volume=.07;
+                stored.visualEffectStrength=1.5;
+                stored.clips.forEach(clip->clip.visualEffect="smooth");
                 Path sound=Path.of(System.getProperty("megalodonte.editor.settingsDir"),"cue.wav");
                 Files.write(sound,new byte[]{1,2,3});
                 for(int i=0;i<4;i++) {var effect=new VideoProject.SoundEffect();effect.file=sound.toString();effect.start=1;stored.effects.add(effect);}
@@ -171,6 +173,8 @@ class EditorViewTest {
                 try (var app=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     app.render(); app.onMount(); var session=app.current();
                     assertEquals(stored.script,session.states().get("roteiro"));
+                    assertEquals("smooth",session.states().get("motionEffect"));
+                    assertEquals(1.5,VideoProject.load(file).visualEffectStrength);
                     assertEquals("dummy-restored-key",session.states().get("openaiKey"));
                     assertEquals("dummy-restored-key",new EditorSettings().load().apiKey);
                     assertFalse(Files.readString(file).contains("openaiApiKey"));
