@@ -23,6 +23,7 @@ final class SoundApplicator {
     }
 
     private record Sound(Path file, Set<String> tags) { }
+    private record Candidate(int scene, Sound sound, double score) { }
     private record CatalogKey(Path directory, String filename) { }
     private static final Pattern ENTRY = Pattern.compile("(?m)^\\[(.+)]\\s*$");
     private static final Pattern TAG = Pattern.compile("#([\\p{L}\\p{N}_-]+)");
@@ -35,6 +36,12 @@ final class SoundApplicator {
     private SoundApplicator() { }
 
     static Result apply(VideoProject project, Path library) throws IOException {
+        return apply(project,library,100);
+    }
+
+    /** Percentage of scenes that may contain sound effects; background music is independent. */
+    static Result apply(VideoProject project, Path library,int effectPercent) throws IOException {
+        EditorSettings.validateSoundEffectPercent(effectPercent);
         if (!Files.isDirectory(library) || !Files.isReadable(library))
             throw new IOException("A pasta de sons configurada não existe ou não pode ser lida: " + library);
         List<Sound> sounds = catalog(library);
@@ -55,19 +62,41 @@ final class SoundApplicator {
             }
         }
 
-        var added = new ArrayList<VideoProject.SoundEffect>();
+        int target=(int)Math.ceil(project.clips.size()*effectPercent/100.0);
+        var occupied=new HashSet<Integer>();
+        for(int scene=0;scene<project.clips.size();scene++) {
+            double start=sceneStart(project,scene),end=start+project.clips.get(scene).duration;
+            for(var effect:project.effects) if(effect.start>=start && effect.start<end) { occupied.add(scene);break; }
+        }
+        var candidates=new ArrayList<Candidate>();
         for (int scene = 0; scene < project.clips.size(); scene++) {
             var clip = project.clips.get(scene);
             var sceneWords = words(clip.text);
-            Sound candidate = sounds.stream().filter(sound -> hasRole(sound, EFFECT_TAGS))
-                    .filter(sound -> project.effects.stream().noneMatch(effect -> sameFile(effect.file, sound.file())))
-                    .max(Comparator.comparingDouble(sound -> score(sound, sceneWords)))
-                    .filter(sound -> score(sound, sceneWords) >= MIN_SCORE).orElse(null);
-            if (candidate == null) continue;
             double start = sceneStart(project, scene);
-            if (project.effects.stream().anyMatch(effect -> Math.abs(effect.start - start) < 1.0)) continue;
+            if(occupied.contains(scene) || project.effects.stream().anyMatch(effect -> Math.abs(effect.start-start)<1.0)) continue;
+            for(Sound sound:sounds) {
+                if(!hasRole(sound,EFFECT_TAGS) || project.effects.stream().anyMatch(effect->sameFile(effect.file,sound.file()))) continue;
+                double relevance=score(sound,sceneWords);
+                if(relevance>=MIN_SCORE)candidates.add(new Candidate(scene,sound,relevance));
+            }
+        }
+        candidates.sort(Comparator.comparingDouble(Candidate::score).reversed()
+                .thenComparingInt(Candidate::scene).thenComparing(candidate->candidate.sound.file().toString()));
+        var chosen=new ArrayList<Candidate>();
+        var usedFiles=new HashSet<Path>();
+        for(Candidate candidate:candidates) {
+            if(occupied.size()+chosen.size()>=target)break;
+            if(chosen.stream().anyMatch(value->value.scene==candidate.scene) || !usedFiles.add(candidate.sound.file()))continue;
+            chosen.add(candidate);
+        }
+        chosen.sort(Comparator.comparingInt(Candidate::scene));
+        var added = new ArrayList<VideoProject.SoundEffect>();
+        for(Candidate candidate:chosen) {
+            int scene=candidate.scene;
+            var clip=project.clips.get(scene);
+            double start=sceneStart(project,scene);
             var effect = new VideoProject.SoundEffect();
-            effect.file = candidate.file().toAbsolutePath().toString();
+            effect.file = candidate.sound.file().toAbsolutePath().toString();
             effect.start = Math.min(start + .4, start + clip.duration - .1);
             effect.offset = 0;
             effect.duration = Math.min(3, start + clip.duration - effect.start);

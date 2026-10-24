@@ -81,6 +81,14 @@
     "showPrompt": {
       "type": "boolean",
       "initial": false
+    },
+    "soundEffectPercent": {
+      "type": "string",
+      "initial": "100"
+    },
+    "soundEffectPercentOptions": {
+      "type": "string",
+      "initial": "[]"
     }
   },
   "view": {
@@ -271,6 +279,30 @@
                         "type": "Text",
                         "props": {
                           "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Cobertura de efeitos sonoros"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "soundEffectPercentInput",
+                        "props": {
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "soundEffectPercent",
+                          "items": "soundEffectPercentOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Percentual máximo de cenas que receberão efeitos ao clicar em Aplicar sons. A música de fundo é independente.",
                           "wrapWidth": 520
                         }
                       }

@@ -43,6 +43,11 @@ class EditorViewTest {
                     assertTrue(navigation.getStyle().contains("#2563eb"));
                 }
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
+                var effectCoverage=settingsRoot.lookupAll(".combo-box").stream()
+                    .filter(n->n instanceof ComboBox<?> box && box.getItems().contains("50% de efeitos sonoros"))
+                    .map(n->(ComboBox<String>)n).findFirst().orElseThrow();
+                assertEquals("100% de efeitos sonoros",effectCoverage.getValue());
+                effectCoverage.setValue("50% de efeitos sonoros");
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
                 folderField.setText("/diretorio-inexistente-para-teste");
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
@@ -56,6 +61,7 @@ class EditorViewTest {
                 saveSettings.fire();assertFalse(settingsStage.isShowing());assertEquals("dummy-settings-key",session.states().get("openaiKey"));
                 var persisted=new EditorSettings().load();assertEquals(soundsFolder.toString(),persisted.soundsDirectory);assertEquals("Prompt editado e salvo",persisted.basePrompt);
                 assertEquals(1.7,persisted.pauseCutThreshold);
+                assertEquals(50,persisted.soundEffectPercent);
                 try(var restarted=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     restarted.render();restarted.onMount();assertEquals("dummy-settings-key",restarted.current().states().get("openaiKey"));
                 }

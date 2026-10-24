@@ -24,7 +24,7 @@ public final class Editor extends ViewScript {
                 settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
-                settings.whisperCpuThreads,settings.whisperVad),values -> {
+                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent),values -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             if(!project.clips.isEmpty()) {
                 project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
@@ -208,7 +208,7 @@ public final class Editor extends ViewScript {
         try {
             Path library=EditorSettings.validateSounds(settings.soundsDirectory);
             var updated=project.snapshot();updated.script=text("roteiro");
-            var additions=SoundApplicator.apply(updated,library);
+            var additions=SoundApplicator.apply(updated,library,settings.soundEffectPercent);
             if(additions.addedCount()==0) {
                 String status=project.music.file.isBlank() ? "Não encontrei uma trilha ambiente nem efeitos correspondentes na biblioteca." :
                         "A música existente foi preservada; os efeitos aplicáveis já estão na timeline.";

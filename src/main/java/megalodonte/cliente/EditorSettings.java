@@ -18,6 +18,7 @@ final class EditorSettings {
         final String whisperModel, whisperLanguage;
         final int whisperBeamSize, whisperCpuThreads;
         final boolean whisperVad;
+        final int soundEffectPercent;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
         }
@@ -31,12 +32,19 @@ final class EditorSettings {
         Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
                String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
                int whisperBeamSize,int whisperCpuThreads,boolean whisperVad) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
+                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,100);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
+               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
             this.defaultVisualEffect=defaultVisualEffect;
             this.visualEffectStrength=visualEffectStrength;
             this.whisperModel=whisperModel;this.whisperLanguage=whisperLanguage;
             this.whisperBeamSize=whisperBeamSize;this.whisperCpuThreads=whisperCpuThreads;this.whisperVad=whisperVad;
+            this.soundEffectPercent=soundEffectPercent;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -64,8 +72,10 @@ final class EditorSettings {
             int beam=json.has("whisperBeamSize")?json.get("whisperBeamSize").getAsInt():5;
             int threads=json.has("whisperCpuThreads")?json.get("whisperCpuThreads").getAsInt():4;
             boolean vad=json.has("whisperVad")?json.get("whisperVad").getAsBoolean():true;
+            int soundEffectPercent=json.has("soundEffectPercent")?json.get("soundEffectPercent").getAsInt():100;
             validateWhisper(model,language,beam,threads);
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad);
+            validateSoundEffectPercent(soundEffectPercent);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent);
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
@@ -75,15 +85,16 @@ final class EditorSettings {
         validateVisualEffect(values.defaultVisualEffect);
         VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
         validateWhisper(values.whisperModel,values.whisperLanguage,values.whisperBeamSize,values.whisperCpuThreads);
+        validateSoundEffectPercent(values.soundEffectPercent);
         write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold,
                 values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
-                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad));
+                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
         var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold,
                 current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
-                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad));
+                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
@@ -95,6 +106,7 @@ final class EditorSettings {
         json.addProperty("whisperModel",values.whisperModel);json.addProperty("whisperLanguage",values.whisperLanguage);
         json.addProperty("whisperBeamSize",values.whisperBeamSize);json.addProperty("whisperCpuThreads",values.whisperCpuThreads);
         json.addProperty("whisperVad",values.whisperVad);
+        json.addProperty("soundEffectPercent",values.soundEffectPercent);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
@@ -140,6 +152,15 @@ final class EditorSettings {
         try { int number=Integer.parseInt(value.strip());if(number>=min&&number<=max)return number; }
         catch(NumberFormatException ignored) { }
         throw new IllegalArgumentException(name+" deve ficar entre "+min+" e "+max+".");
+    }
+    static int validateSoundEffectPercent(int value) {
+        if(!java.util.Set.of(0,25,50,75,100).contains(value))
+            throw new IllegalArgumentException("Escolha 0%, 25%, 50%, 75% ou 100% de efeitos sonoros.");
+        return value;
+    }
+    static int parseSoundEffectPercent(String value) {
+        try { return validateSoundEffectPercent(Integer.parseInt(value.strip().split("%",2)[0].strip())); }
+        catch(NumberFormatException e) { throw new IllegalArgumentException("Escolha um percentual de efeitos sonoros válido."); }
     }
     private static String value(JsonObject json,String name,String fallback) {
         return json.has(name) && !json.get(name).isJsonNull() ? json.get(name).getAsString() : fallback;

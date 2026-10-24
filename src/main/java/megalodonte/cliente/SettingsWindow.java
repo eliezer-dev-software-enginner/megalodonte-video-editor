@@ -27,7 +27,8 @@ final class SettingsWindow implements AutoCloseable {
                     view.states().string("whisperModel").get(),view.states().string("whisperLanguage").get(),
                     EditorSettings.parseWhisperNumber(view.states().string("whisperBeamSize").get(),"A busca do Whisper",1,10),
                     EditorSettings.parseWhisperNumber(view.states().string("whisperCpuThreads").get(),"As threads do Whisper",1,16),
-                    Boolean.parseBoolean(view.states().string("whisperVad").get()));
+                    Boolean.parseBoolean(view.states().string("whisperVad").get()),
+                    EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected);stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -58,6 +59,8 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("whisperBeamSize",Integer.toString(values.whisperBeamSize));
         session.states().set("whisperCpuThreads",Integer.toString(values.whisperCpuThreads));
         session.states().set("whisperVad",Boolean.toString(values.whisperVad));
+        session.states().set("soundEffectPercentOptions","[\"0% de efeitos sonoros\",\"25% de efeitos sonoros\",\"50% de efeitos sonoros\",\"75% de efeitos sonoros\",\"100% de efeitos sonoros\"]");
+        session.states().set("soundEffectPercent",values.soundEffectPercent+"% de efeitos sonoros");
         stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),940,680));
         stage.setMinWidth(820);stage.setMinHeight(520);
         showSection(session,"General");

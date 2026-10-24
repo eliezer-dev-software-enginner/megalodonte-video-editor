@@ -48,6 +48,27 @@ class SoundApplicatorTest {
         assertTrue(error.getMessage().contains("TXT"));
     }
 
+    @Test void percentageLimitsSceneEffectsWithoutLimitingBackgroundMusic() throws Exception {
+        Path library=Files.createDirectories(folder.resolve("coverage"));
+        audio(library,"music.mp3");
+        Files.writeString(library.resolve("TXT.txt"),"[music.mp3]\n#trilha #jornada\n");
+        StringBuilder catalog=new StringBuilder(Files.readString(library.resolve("TXT.txt")));
+        for(String word:new String[]{"chuva","vento","floresta","oceano"}) {
+            audio(library,word+".wav");catalog.append('[').append(word).append(".wav]\n#efeito #").append(word).append('\n');
+        }
+        Files.writeString(library.resolve("TXT.txt"),catalog);
+        var project=VideoProject.fromScript("Uma jornada na chuva.\n\nSopra o vento.\n\nA floresta desperta.\n\nO oceano se move.");
+        assertTrue(SoundApplicator.apply(project,library,0).musicAdded());
+        assertEquals(0,project.effects.size());
+        assertEquals(1,SoundApplicator.apply(project,library,25).effectsAdded().size());
+        assertEquals(1,project.effects.size());
+        assertEquals(1,SoundApplicator.apply(project,library,50).effectsAdded().size());
+        assertEquals(2,project.effects.size());
+        assertEquals(0,SoundApplicator.apply(project,library,25).effectsAdded().size());
+        assertEquals(2,SoundApplicator.apply(project,library,100).effectsAdded().size());
+        assertEquals(0,SoundApplicator.apply(project,library,100).addedCount());
+    }
+
     private static Path audio(Path root,String name) throws Exception {
         Path file=root.resolve(name);Files.writeString(file,"fixture audio");return file;
     }
