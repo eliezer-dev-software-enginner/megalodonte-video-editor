@@ -8,12 +8,17 @@ class EditorSettingsTest {
     @Test void defaultsPersistPromptAndSoundsAndProtectPriorPreferencesOnError() throws Exception {
         Path file=folder.resolve("preferences/settings.json");var store=new EditorSettings(file);
         var defaults=store.load();assertEquals(EditorSettings.DEFAULT_SOUNDS,defaults.soundsDirectory);
+        assertEquals(1.0,defaults.pauseCutThreshold);
         assertTrue(defaults.basePrompt.contains("PRODUTOR DO PROJETO"));assertTrue(defaults.basePrompt.contains("audio.effects"));
-        var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.");
+        var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.",1.8);
         store.save(values);var restored=new EditorSettings(file).load();assertEquals(values.apiKey,restored.apiKey);assertEquals(values.basePrompt,restored.basePrompt);
+        assertEquals(1.8,restored.pauseCutThreshold);
         assertEquals(folder.toString(),restored.soundsDirectory);assertFalse(values.toString().contains(values.apiKey));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.resolve("missing").toString(),"Prompt")));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.toString()," ")));
+        assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.toString(),"Prompt",Double.NaN)));
+        assertThrows(IllegalArgumentException.class,()->EditorSettings.parsePauseCutThreshold("31"));
+        assertEquals(1.5,EditorSettings.parsePauseCutThreshold("1,5"));
         assertEquals(values.basePrompt,store.load().basePrompt);
         if(Files.getFileStore(file).supportsFileAttributeView("posix")) assertEquals("rw-------",java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)));
     }
@@ -23,10 +28,17 @@ class EditorSettingsTest {
     }
     @Test void legacyKeyMigrationStaysLocalAndPreservesOtherSettings() throws Exception {
         Path file=folder.resolve("settings.json");var store=new EditorSettings(file);
+        store.save(new EditorSettings.Values("",folder.toString(),"Prompt",2.4));
         store.saveApiKey("dummy-legacy-key");
         var values=store.load();assertEquals("dummy-legacy-key",values.apiKey);
-        assertEquals(EditorSettings.DEFAULT_SOUNDS,values.soundsDirectory);
-        assertTrue(values.basePrompt.contains("audio.effects"));
+        assertEquals(folder.toString(),values.soundsDirectory);
+        assertEquals("Prompt",values.basePrompt);
+        assertEquals(2.4,values.pauseCutThreshold);
         if(Files.getFileStore(file).supportsFileAttributeView("posix")) assertEquals("rw-------",java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(file)));
+    }
+    @Test void olderSettingsWithoutPauseValueUseDefault() throws Exception {
+        Path file=folder.resolve("settings.json");
+        Files.writeString(file,"{\"soundsDirectory\":\""+folder.toString().replace("\\","\\\\")+"\",\"basePrompt\":\"Prompt\"}");
+        assertEquals(1.0,new EditorSettings(file).load().pauseCutThreshold);
     }
 }

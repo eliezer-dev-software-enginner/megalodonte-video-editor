@@ -20,7 +20,7 @@ public final class Editor extends ViewScript {
         if(generationBusy()) return;
         pausePlayback();
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
-        settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,settings.basePrompt),values -> {
+        settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,settings.basePrompt,settings.pauseCutThreshold),values -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             message("Configurações salvas. Prompt base e biblioteca de sons disponíveis para a geração de vídeo.");
         });
@@ -93,7 +93,7 @@ public final class Editor extends ViewScript {
             project.save(projectFile,projectRevision);
             projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();
             pausePlayback();
-            whisperSync=new WhisperSync(projectFile);
+            whisperSync=new WhisperSync(projectFile,settings.pauseCutThreshold);
         } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage()); return; }
         var sync=whisperSync;var targetProject=project;var targetFile=projectFile;
         whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()-> {

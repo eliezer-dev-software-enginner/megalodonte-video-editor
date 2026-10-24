@@ -31,19 +31,24 @@ class EditorViewTest {
                 var settingsRoot=settingsStage.getScene().getRoot(); settingsRoot.applyCss();settingsRoot.layout();
                 var keyField=(PasswordField)settingsRoot.lookup(".password-field");
                 var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Diretório de sons e efeitos".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
+                var pauseField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "1,0".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
+                assertEquals("1.0",pauseField.getText());
                 assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
                 folderField.setText("/diretorio-inexistente-para-teste");
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
                 saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
                 var soundsFolder=Files.createTempDirectory("editor-sounds-");folderField.setText(soundsFolder.toString());
+                pauseField.setText("31");saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
+                pauseField.setText("1,7");
                 var settingsShot=settingsRoot.snapshot(null,null);var settingsPng=new BufferedImage((int)settingsShot.getWidth(),(int)settingsShot.getHeight(),BufferedImage.TYPE_INT_ARGB);
                 for(int y=0;y<settingsPng.getHeight();y++)for(int x=0;x<settingsPng.getWidth();x++)settingsPng.setRGB(x,y,settingsShot.getPixelReader().getArgb(x,y));
                 Files.createDirectories(Path.of("build/preview"));ImageIO.write(settingsPng,"png",Path.of("build/preview/settings-window.png").toFile());
                 saveSettings.fire();assertFalse(settingsStage.isShowing());assertEquals("dummy-settings-key",session.states().get("openaiKey"));
                 var persisted=new EditorSettings().load();assertEquals(soundsFolder.toString(),persisted.soundsDirectory);assertEquals("Prompt editado e salvo",persisted.basePrompt);
+                assertEquals(1.7,persisted.pauseCutThreshold);
                 try(var restarted=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     restarted.render();restarted.onMount();assertEquals("dummy-settings-key",restarted.current().states().get("openaiKey"));
                 }

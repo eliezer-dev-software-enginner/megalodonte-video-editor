@@ -14,6 +14,10 @@
       "type": "string",
       "initial": ""
     },
+    "pauseCutThreshold": {
+      "type": "string",
+      "initial": "1.0"
+    },
     "mensagem": {
       "type": "string",
       "initial": ""
@@ -109,6 +113,31 @@
                 "type": "Text",
                 "props": {
                   "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
+                  "wrapWidth": 640
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "Pausa mínima para trocar de cena após a fala (segundos)"
+                }
+              },
+              {
+                "type": "Input",
+                "id": "pauseCutThresholdInput",
+                "props": {
+                  "height": 36,
+                  "width": 150,
+                  "placeholder": "1,0"
+                },
+                "bind": {
+                  "value": "pauseCutThreshold"
+                }
+              },
+              {
+                "type": "Text",
+                "props": {
+                  "text": "Pausas menores mantêm o corte no meio do intervalo. Não cria cenas: o roteiro precisa indicar a transição.",
                   "wrapWidth": 640
                 }
               },

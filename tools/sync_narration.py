@@ -22,7 +22,10 @@ def tokens(text):
     return re.findall(r'[a-z0-9]+', plain)
 
 
-def align(clips, words, audio_duration, fps=30):
+def align(clips, words, audio_duration, fps=30,
+          pause_cut_threshold=PAUSE_CUT_THRESHOLD):
+    if not math.isfinite(pause_cut_threshold) or not .1 <= pause_cut_threshold <= 30:
+        raise ValueError('A pausa mínima deve ficar entre 0,1 e 30 segundos.')
     expected = []
     ranges = []
     for clip in clips:
@@ -80,7 +83,7 @@ def align(clips, words, audio_duration, fps=30):
         if following['speechStart'] < previous['speechEnd'] - .75:
             raise ValueError('Tempos de fala conflitantes; revisar a transcrição.')
         gap = following['speechStart'] - previous['speechEnd']
-        if gap >= PAUSE_CUT_THRESHOLD:
+        if gap >= pause_cut_threshold:
             # Only a text-anchored scene boundary can consume a long pause.
             # Switch images soon after the previous speech ends, so the next
             # scene is already visible while the speaker prepares its line.
@@ -109,6 +112,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('project', type=Path)
     parser.add_argument('--apply', action='store_true')
+    parser.add_argument('--pause-cut-threshold', type=float, default=PAUSE_CUT_THRESHOLD,
+                        help='Pausa mínima entre cenas para cortar após a fala anterior (segundos).')
     args = parser.parse_args()
     manifest = args.project.resolve()
     original = manifest.read_bytes()
@@ -121,10 +126,12 @@ def main():
     duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
                                              'format=duration', '-of', 'csv=p=0', str(audio)], text=True))
     words = [word for segment in transcript['segments'] for word in segment['words']]
-    report = align(project['clips'], words, duration)
+    report = align(project['clips'], words, duration, pause_cut_threshold=args.pause_cut_threshold)
+    report['pauseCutThreshold'] = args.pause_cut_threshold
     report['audioSha256'] = transcript['audioSha256']
     (folder / 'alinhamento.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
-    rows = ['# Sincronização com a narração', '', f'Correspondência: {report["coverage"]:.1%}.', '',
+    rows = ['# Sincronização com a narração', '', f'Correspondência: {report["coverage"]:.1%}.',
+            f'Pausa mínima para corte após a fala: {args.pause_cut_threshold:.2f}s.', '',
             '| Cena | Entrada | Duração | Início da fala | Pausa anterior | Tipo de corte | Correspondência |',
             '|---|---|---|---|---|---|---|']
     for scene in report['scenes']:

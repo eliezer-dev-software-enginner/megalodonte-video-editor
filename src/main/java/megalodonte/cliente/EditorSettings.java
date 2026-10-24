@@ -9,10 +9,16 @@ import java.nio.file.attribute.PosixFilePermissions;
 /** Shared local editor preferences; credentials are never written to project manifests. */
 final class EditorSettings {
     static final String DEFAULT_SOUNDS = "/home/eliezer/Desktop/backup/sounds";
+    static final double DEFAULT_PAUSE_CUT_THRESHOLD = 1.0;
     static final class Values {
         final String apiKey, soundsDirectory, basePrompt;
+        final double pauseCutThreshold;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
+            this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
+            this.pauseCutThreshold=pauseCutThreshold;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -30,22 +36,26 @@ final class EditorSettings {
         if(!exists()) return new Values("",DEFAULT_SOUNDS,defaultPrompt());
         try {
             var json=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()));
+            double threshold=json.has("pauseCutThreshold") ? json.get("pauseCutThreshold").getAsDouble() : DEFAULT_PAUSE_CUT_THRESHOLD;
+            validatePauseCutThreshold(threshold);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold);
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
         Path directory=validateSounds(values.soundsDirectory);
         if(values.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
-        write(new Values(values.apiKey,directory.toString(),values.basePrompt));
+        validatePauseCutThreshold(values.pauseCutThreshold);
+        write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
-        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt));
+        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
         var json=new JsonObject(); json.addProperty("openaiApiKey",values.apiKey.strip());
         json.addProperty("soundsDirectory",values.soundsDirectory); json.addProperty("basePrompt",values.basePrompt);
+        json.addProperty("pauseCutThreshold",values.pauseCutThreshold);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
@@ -60,6 +70,15 @@ final class EditorSettings {
         Path folder=Path.of(value.strip()).toAbsolutePath().normalize();
         if(!Files.isDirectory(folder) || !Files.isReadable(folder)) throw new IllegalArgumentException("Escolha um diretório de sons existente e legível.");
         return folder;
+    }
+    static double parsePauseCutThreshold(String value) {
+        try { return validatePauseCutThreshold(Double.parseDouble(value.strip().replace(',', '.'))); }
+        catch(NumberFormatException e) { throw new IllegalArgumentException("Informe a pausa mínima em segundos (0,1 a 30)."); }
+    }
+    static double validatePauseCutThreshold(double value) {
+        if(!Double.isFinite(value) || value<.1 || value>30)
+            throw new IllegalArgumentException("A pausa mínima deve ficar entre 0,1 e 30 segundos.");
+        return value;
     }
     private static String value(JsonObject json,String name,String fallback) {
         return json.has(name) && !json.get(name).isJsonNull() ? json.get(name).getAsString() : fallback;

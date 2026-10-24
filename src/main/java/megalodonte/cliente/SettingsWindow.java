@@ -20,7 +20,8 @@ final class SettingsWindow implements AutoCloseable {
             try {
                 var selected=new EditorSettings.Values(view.states().string("apiKey").get().strip(),
                     EditorSettings.validateSounds(view.states().string("soundsDirectory").get()).toString(),
-                    view.states().string("basePrompt").get());
+                    view.states().string("basePrompt").get(),
+                    EditorSettings.parsePauseCutThreshold(view.states().string("pauseCutThreshold").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected);stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -34,7 +35,9 @@ final class SettingsWindow implements AutoCloseable {
               if(selected!=null) view.states().set("soundsDirectory",selected.toPath().toAbsolutePath().normalize().toString());
           });
         session=UiDefinition.fromResource(SettingsWindow.class,"/views/settings.view.jsonc").open(actions);
-        session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);session.states().set("basePrompt",values.basePrompt);
+        session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
+        session.states().set("basePrompt",values.basePrompt);
+        session.states().set("pauseCutThreshold",Double.toString(values.pauseCutThreshold));
         stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),760,680));
         stage.setMinWidth(740);stage.setMinHeight(520);
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });

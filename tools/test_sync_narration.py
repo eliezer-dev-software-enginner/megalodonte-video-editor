@@ -29,6 +29,18 @@ class AlignmentTest(unittest.TestCase):
         self.assertEqual(round(((.9+1.3)/2)*30)/30, result['scenes'][1]['start'])
         self.assertEqual('midpoint', result['scenes'][1]['cutMode'])
 
+    def test_pause_threshold_can_be_configured(self):
+        clips = [{'text': 'Bom dia cidade'}, {'text': 'A energia chegou'}]
+        texts = 'Bom dia cidade A energia chegou'.split()
+        starts = [.1, .4, .7, 2.4, 2.7, 3.0]
+        words = [dict(text=text, start=start, end=start+.2) for text, start in zip(texts, starts)]
+        default = align(clips, words, 3.4)
+        slower = align(clips, words, 3.4, pause_cut_threshold=2)
+        self.assertEqual('after_speech', default['scenes'][1]['cutMode'])
+        self.assertEqual('midpoint', slower['scenes'][1]['cutMode'])
+        self.assertGreater(slower['scenes'][1]['start'], default['scenes'][1]['start'])
+        with self.assertRaises(ValueError): align(clips, words, 3.4, pause_cut_threshold=float('nan'))
+
     def test_long_pause_inside_one_scene_does_not_create_cut(self):
         clips = [{'text': 'Bom dia cidade energia chegou hoje'}]
         texts = 'Bom dia cidade energia chegou hoje'.split()

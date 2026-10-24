@@ -16,10 +16,12 @@ final class WhisperSync {
     private final Path project;
     private final Path scriptsRoot;
     private final Path python;
+    private final double pauseCutThreshold;
     private volatile Process activeProcess;
 
-    WhisperSync(Path project) throws IOException {
+    WhisperSync(Path project,double pauseCutThreshold) throws IOException {
         this.project = project.toAbsolutePath().normalize();
+        this.pauseCutThreshold=EditorSettings.validatePauseCutThreshold(pauseCutThreshold);
         this.scriptsRoot = findScriptsRoot();
         this.python = findPython(scriptsRoot);
     }
@@ -27,7 +29,8 @@ final class WhisperSync {
     void run(Consumer<String> progress) throws IOException, InterruptedException {
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/transcribe_narration.py").toString(), project.toString()),
                 progress, "Whisper falhou ao transcrever o áudio.");
-        execute(List.of(python.toString(), scriptsRoot.resolve("tools/sync_narration.py").toString(), project.toString(), "--apply"),
+        execute(List.of(python.toString(), scriptsRoot.resolve("tools/sync_narration.py").toString(), project.toString(),
+                        "--pause-cut-threshold",Double.toString(pauseCutThreshold),"--apply"),
                 progress, "Não foi possível alinhar a narração ao roteiro.");
     }
 
