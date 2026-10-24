@@ -99,10 +99,11 @@ public final class VideoProject {
         Path absolute = file.toAbsolutePath(); Files.createDirectories(absolute.getParent());
         requireRevision(absolute,expectedRevision);
         Path assets = absolute.getParent().resolve(absolute.getFileName() + ".assets"); Files.createDirectories(assets);
+        Map<Path,String> savedAssets = new HashMap<>();
         var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script); var scenes = new JsonArray();
         for (Clip clip : clips) {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
-            String image = copyAsset(clip.image, absolute, assets);
+            String image = copyAsset(clip.image, absolute, assets, savedAssets);
             scene.addProperty("image", image); scenes.add(scene);
             validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
         }
@@ -110,10 +111,10 @@ public final class VideoProject {
         validateVisualEffectStrength(visualEffectStrength);
         root.addProperty("visualEffectStrength", visualEffectStrength);
         var audio = new JsonObject();
-        audio.add("narration", audioJson(narration,absolute,assets,MAX_NARRATION_GAIN));
-        audio.add("music", audioJson(music,absolute,assets,1));
+        audio.add("narration", audioJson(narration,absolute,assets,MAX_NARRATION_GAIN,savedAssets));
+        audio.add("music", audioJson(music,absolute,assets,1,savedAssets));
         var sounds=new JsonArray();
-        for(var effect:effects) { effect.validate();var json=new Gson().toJsonTree(effect).getAsJsonObject();json.addProperty("file",copyAsset(effect.file,absolute,assets));sounds.add(json); }
+        for(var effect:effects) { effect.validate();var json=new Gson().toJsonTree(effect).getAsJsonObject();json.addProperty("file",copyAsset(effect.file,absolute,assets,savedAssets));sounds.add(json); }
         audio.add("effects",sounds);root.add("audio", audio);
         Path temporary = Files.createTempFile(absolute.getParent(), ".video-project-", ".tmp");
         try {
@@ -196,16 +197,27 @@ public final class VideoProject {
             return true;
         } finally { Files.deleteIfExists(temporary); }
     }
-    private static String copyAsset(String sourceName, Path manifest, Path assets) throws IOException {
+    private static String copyAsset(String sourceName, Path manifest, Path assets, Map<Path,String> savedAssets) throws IOException {
         if (sourceName.isBlank()) return "";
-        Path source = Path.of(sourceName);
+        Path source = Path.of(sourceName).toAbsolutePath().normalize();
         if (!Files.isRegularFile(source)) throw new IOException("Asset ausente: " + source);
-        Path target = assets.resolve(UUID.randomUUID() + "-" + source.getFileName()); Files.copy(source,target);
-        return manifest.getParent().relativize(target).toString();
+        String cached=savedAssets.get(source);
+        if(cached!=null)return cached;
+        Path target;
+        if(source.startsWith(assets.toAbsolutePath().normalize())) target=source;
+        else {
+            String original=source.getFileName().toString();
+            String extension=original.lastIndexOf('.')>=0 ? original.substring(original.lastIndexOf('.')) : "";
+            target=assets.resolve(UUID.randomUUID()+extension);
+            Files.copy(source,target);
+        }
+        String relative=manifest.getParent().relativize(target).toString();
+        savedAssets.put(source,relative);
+        return relative;
     }
-    private static JsonObject audioJson(AudioTrack track, Path manifest, Path assets,double maximum) throws IOException {
+    private static JsonObject audioJson(AudioTrack track, Path manifest, Path assets,double maximum,Map<Path,String> savedAssets) throws IOException {
         validateVolume(track.volume,maximum);
-        var json = new JsonObject(); json.addProperty("file",copyAsset(track.file,manifest,assets)); json.addProperty("volume",track.volume); return json;
+        var json = new JsonObject(); json.addProperty("file",copyAsset(track.file,manifest,assets,savedAssets)); json.addProperty("volume",track.volume); return json;
     }
     private static void readAudio(JsonObject json, AudioTrack track, Path manifest,double maximum) {
         if (json == null) return;

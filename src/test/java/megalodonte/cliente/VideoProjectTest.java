@@ -5,6 +5,23 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
+    @Test void repeatedSaveReusesProjectAssetsWithoutGrowingNames() throws Exception {
+        var source=directory.resolve("ressona-narracao-2026-10-24-a1fe5f19.mp3");
+        Files.write(source,new byte[]{1,2,3});
+        var project=new VideoProject();project.narration.file=source.toString();
+        var effect=new VideoProject.SoundEffect();effect.file=source.toString();project.effects.add(effect);
+        var manifest=directory.resolve("video.mvideo.json");project.save(manifest);
+        var loaded=VideoProject.load(manifest);
+        var stored=Path.of(loaded.narration.file);
+        assertEquals(stored,Path.of(loaded.effects.getFirst().file));
+        for(int i=0;i<5;i++) { loaded.save(manifest);loaded=VideoProject.load(manifest); }
+        assertEquals(stored,Path.of(loaded.narration.file));
+        try(var files=Files.list(manifest.resolveSibling(manifest.getFileName()+".assets"))) {
+            assertEquals(1,files.count());
+        }
+        assertEquals("ressona-narracao-2026-10-24-a1fe5f19.mp3",Editor.assetDisplayName(
+            "12345678-1234-1234-1234-123456789abc-12345678-1234-1234-1234-123456789abc-ressona-narracao-2026-10-24-a1fe5f19.mp3"));
+    }
     @Test void projectNeverSavesApiKeyAndCanSanitizeLegacyMetadata() throws Exception {
         var project = VideoProject.fromScript("Cena"); project.animateImages = true;
         assertTrue(project.snapshot().animateImages);

@@ -146,8 +146,12 @@ public final class Editor extends ViewScript {
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
     }
     private void audioError(String error) { if (!disposed) message(error); }
+    static String assetDisplayName(String file) {
+        return Path.of(file).getFileName().toString()
+            .replaceFirst("^(?:[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}-)+","");
+    }
     private void refreshAudio() {
-        set("narracaoNome",project.narration.file.isBlank() ? "Nenhuma narração anexada" : "Narração: " + Path.of(project.narration.file).getFileName());
+        set("narracaoNome",project.narration.file.isBlank() ? "Nenhuma narração anexada" : "Narração: " + assetDisplayName(project.narration.file));
         set("musicaNome",project.music.file.isBlank() ? "Nenhuma música anexada" : "Música: " + Path.of(project.music.file).getFileName());
         set("volumeNarracao",Double.toString(project.narration.volume*100)); set("volumeMusica",Double.toString(project.music.volume*100));
         set("semNarracao",project.narration.file.isBlank()); set("semMusica",project.music.file.isBlank());
