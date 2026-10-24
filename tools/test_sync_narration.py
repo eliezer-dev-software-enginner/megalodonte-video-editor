@@ -10,11 +10,33 @@ class AlignmentTest(unittest.TestCase):
         words = [dict(text=text, start=start, end=start+.3) for text, start in zip(texts, starts)]
         result = align(clips, words, 5.019)
         self.assertEqual(1, result['coverage'])
-        self.assertEqual(round(((1.7+3.2)/2)*30)/30, result['scenes'][1]['start'])
+        self.assertEqual(round((1.7+.2)*30)/30, result['scenes'][1]['start'])
+        self.assertEqual('after_speech', result['scenes'][1]['cutMode'])
+        self.assertAlmostEqual(1.5, result['scenes'][1]['precedingPause'])
         self.assertEqual(0, result['scenes'][0]['start'])
         self.assertGreaterEqual(result['timelineDuration'], 5.019)
         self.assertLess(result['timelineDuration']-5.019, 1/30)
         self.assertAlmostEqual(result['timelineDuration'], sum(s['duration'] for s in result['scenes']))
+        self.assertAlmostEqual(.6, result['leadingSilence'])
+        self.assertAlmostEqual(.619, result['trailingSilence'])
+
+    def test_short_pause_keeps_midpoint_cut(self):
+        clips = [{'text': 'Bom dia cidade'}, {'text': 'A energia chegou'}]
+        texts = 'Bom dia cidade A energia chegou'.split()
+        starts = [.1, .4, .7, 1.3, 1.6, 1.9]
+        words = [dict(text=text, start=start, end=start+.2) for text, start in zip(texts, starts)]
+        result = align(clips, words, 2.3)
+        self.assertEqual(round(((.9+1.3)/2)*30)/30, result['scenes'][1]['start'])
+        self.assertEqual('midpoint', result['scenes'][1]['cutMode'])
+
+    def test_long_pause_inside_one_scene_does_not_create_cut(self):
+        clips = [{'text': 'Bom dia cidade energia chegou hoje'}]
+        texts = 'Bom dia cidade energia chegou hoje'.split()
+        starts = [.1, .4, .7, 4.0, 4.3, 4.6]
+        words = [dict(text=text, start=start, end=start+.2) for text, start in zip(texts, starts)]
+        result = align(clips, words, 5.2)
+        self.assertEqual(1, len(result['scenes']))
+        self.assertAlmostEqual(5.2, result['scenes'][0]['duration'], delta=1/30)
 
     def test_short_improvised_lead_in_keeps_reliable_scene_anchor(self):
         clips=[{'text':'Fim anterior seguro.'},

@@ -105,9 +105,14 @@ public final class Editor extends ViewScript {
                 }));
                 var report=new com.google.gson.JsonParser().parseString(Files.readString(targetFile.getParent().resolve("sincronizacao/alinhamento.json"))).getAsJsonObject();
                 long partial=report.getAsJsonArray("scenes").asList().stream().filter(scene->scene.getAsJsonObject().get("partial").getAsBoolean()).count();
+                double leading=report.get("leadingSilence").getAsDouble();
+                double trailing=report.get("trailingSilence").getAsDouble();
                 success=true;
                 outcome="Narração sincronizada com Whisper: "+report.getAsJsonArray("scenes").size()+" cenas, "+String.format(Locale.forLanguageTag("pt-BR"),"%.1f%%",report.get("coverage").getAsDouble()*100)+" de correspondência."+
-                        (partial>0 ? " "+partial+" cena(s) tinham fala encurtada e foram ajustadas pela transição seguinte." : "");
+                        (partial>0 ? " "+partial+" cena(s) tinham fala encurtada e foram ajustadas pela transição seguinte." : "")+
+                        ((leading>=1 || trailing>=1) ? " Atenção: a narração contém "+
+                                String.format(Locale.forLanguageTag("pt-BR"),"%.1fs antes da primeira fala e %.1fs após a última",leading,trailing)+
+                                "; corte esses silêncios e sincronize novamente se não forem intencionais." : "");
             } catch(InterruptedException e) { Thread.currentThread().interrupt();outcome="Sincronização cancelada. Nenhuma duração foi aplicada."; }
             catch(Exception e) { outcome="Não foi possível sincronizar: "+e.getMessage(); }
             final String result=outcome;final boolean applied=success;

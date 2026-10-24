@@ -12,6 +12,10 @@ import tempfile
 import unicodedata
 
 
+PAUSE_CUT_THRESHOLD = 1.0
+POST_SPEECH_HOLD = .2
+
+
 def tokens(text):
     plain = ''.join(c for c in unicodedata.normalize('NFKD', text.casefold())
                     if not unicodedata.combining(c))
@@ -75,8 +79,18 @@ def align(clips, words, audio_duration, fps=30):
         # A bounded overlap is resolved at the midpoint; larger conflicts are unsafe.
         if following['speechStart'] < previous['speechEnd'] - .75:
             raise ValueError('Tempos de fala conflitantes; revisar a transcrição.')
-        midpoint = (previous['speechEnd'] + following['speechStart']) / 2
-        boundaries.append(round(midpoint * fps))
+        gap = following['speechStart'] - previous['speechEnd']
+        if gap >= PAUSE_CUT_THRESHOLD:
+            # Only a text-anchored scene boundary can consume a long pause.
+            # Switch images soon after the previous speech ends, so the next
+            # scene is already visible while the speaker prepares its line.
+            cut = previous['speechEnd'] + min(POST_SPEECH_HOLD, gap / 3)
+            following['cutMode'] = 'after_speech'
+        else:
+            cut = (previous['speechEnd'] + following['speechStart']) / 2
+            following['cutMode'] = 'midpoint'
+        following['precedingPause'] = max(0, gap)
+        boundaries.append(round(cut * fps))
     boundaries.append(math.ceil(audio_duration * fps))
     for i, scene in enumerate(scenes):
         if boundaries[i+1] - boundaries[i] < 3:
@@ -86,6 +100,8 @@ def align(clips, words, audio_duration, fps=30):
     if scenes[-1]['speechEnd'] > audio_duration + .1:
         raise ValueError('Transcrição termina além da duração do áudio.')
     return {'coverage': coverage, 'audioDuration': audio_duration,
+            'leadingSilence': max(0, scenes[0]['speechStart']),
+            'trailingSilence': max(0, audio_duration - scenes[-1]['speechEnd']),
             'timelineDuration': boundaries[-1] / fps, 'scenes': scenes}
 
 
@@ -109,12 +125,20 @@ def main():
     report['audioSha256'] = transcript['audioSha256']
     (folder / 'alinhamento.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     rows = ['# Sincronização com a narração', '', f'Correspondência: {report["coverage"]:.1%}.', '',
-            '| Cena | Entrada | Duração | Início da fala | Correspondência |', '|---|---|---|---|---|']
+            '| Cena | Entrada | Duração | Início da fala | Pausa anterior | Tipo de corte | Correspondência |',
+            '|---|---|---|---|---|---|---|']
     for scene in report['scenes']:
         rows.append(f'| {scene["scene"]:02} | {scene["start"]:.3f}s | {scene["duration"]:.3f}s | '
-                    f'{scene["speechStart"]:.3f}s | {scene["coverage"]:.1%} |')
+                    f'{scene["speechStart"]:.3f}s | {scene.get("precedingPause", 0):.3f}s | '
+                    f'{"após fala" if scene.get("cutMode") == "after_speech" else "meio da pausa" if scene.get("cutMode") == "midpoint" else "início"} | '
+                    f'{scene["coverage"]:.1%} |')
         if scene['partial']:
-            rows.append(f'|  |  |  |  | Trecho encurtado na narração; transição mantida pela próxima cena. |')
+            rows.append('|  |  |  |  |  | Fala encurtada; transição mantida pela próxima cena. |  |')
+    if report['leadingSilence'] >= 1 or report['trailingSilence'] >= 1:
+        rows.extend(['', f'Atenção: há {report["leadingSilence"]:.2f}s antes da primeira fala e '
+                     f'{report["trailingSilence"]:.2f}s após a última. Esses silêncios continuam '
+                     'no áudio e nas cenas inicial/final; corte-os no arquivo de narração e '
+                     'sincronize novamente se não fizerem parte do vídeo.'])
     (folder / 'relatorio.md').write_text('\n'.join(rows) + '\n')
     print(f'Cobertura {report["coverage"]:.1%}; áudio {duration:.3f}s; timeline {report["timelineDuration"]:.3f}s.')
     for scene in report['scenes']:
