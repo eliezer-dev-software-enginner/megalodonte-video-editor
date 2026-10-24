@@ -15,7 +15,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class EditorViewTest {
     @Test void editsTimelineThroughDeclarativeControlsAndRendersPreview() throws Exception {
         System.setProperty("megalodonte.editor.settingsDir",Files.createTempDirectory("editor-preferences-").toString());
-        var ready = new CountDownLatch(1); Platform.startup(() -> { Platform.setImplicitExit(false); ready.countDown(); }); assertTrue(ready.await(15, TimeUnit.SECONDS));
+        var ready = new CountDownLatch(1);
+        try { Platform.startup(() -> { Platform.setImplicitExit(false); ready.countDown(); }); }
+        catch(IllegalStateException alreadyStarted) { Platform.runLater(() -> { Platform.setImplicitExit(false); ready.countDown(); }); }
+        assertTrue(ready.await(15, TimeUnit.SECONDS));
         var task = new FutureTask<Void>(() -> {
             ThemeManager.setTheme(new DefaultTheme());
             try (var app = new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()), Editor.class.getClassLoader())) {
@@ -25,6 +28,21 @@ class EditorViewTest {
                 assertEquals("Fechar projeto",((Button)session.component("closeProjectButton").getJavaFxNode()).getText());
                 assertEquals("Aplicar sons",((Button)session.component("applySoundsButton").getJavaFxNode()).getText());
                 assertThrows(IllegalArgumentException.class,()->session.component("openaiKeyInput"));
+                Path reusableEffect=Path.of("build/preview/reusable-effect.wav").toAbsolutePath();
+                Files.createDirectories(reusableEffect.getParent());
+                byte[] silence=new byte[16000];
+                var soundFormat=new javax.sound.sampled.AudioFormat(8000,16,1,true,false);
+                try(var soundStream=new javax.sound.sampled.AudioInputStream(new java.io.ByteArrayInputStream(silence),soundFormat,8000)) {
+                    javax.sound.sampled.AudioSystem.write(soundStream,javax.sound.sampled.AudioFileFormat.Type.WAVE,reusableEffect.toFile());
+                }
+                var manyEffects=new VideoProject();
+                for(int i=0;i<100;i++) { var effect=new VideoProject.SoundEffect();effect.file=reusableEffect.toString();effect.start=i*10+.4;manyEffects.effects.add(effect); }
+                try(var effectPreview=new AudioPreview()) {
+                    effectPreview.load(manyEffects,error->fail(error));
+                    assertTrue(effectPreview.loadedEffectPlayers()<=1);
+                    effectPreview.seek(500);assertTrue(effectPreview.loadedEffectPlayers()<=1);
+                    effectPreview.seek(0);assertTrue(effectPreview.loadedEffectPlayers()<=1);
+                }
                 session.invoke("openSettings");
                 var settingsStage=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream()
                     .filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();

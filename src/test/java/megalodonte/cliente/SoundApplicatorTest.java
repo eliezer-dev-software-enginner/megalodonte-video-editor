@@ -30,7 +30,7 @@ class SoundApplicatorTest {
         assertEquals(2,additions.effectsAdded().size());
         assertEquals(spaceEffect.toAbsolutePath().toString(),project.effects.get(0).file);
         assertEquals(rainEffect.toAbsolutePath().toString(),project.effects.get(1).file);
-        assertTrue(project.effects.stream().allMatch(effect->effect.volume==.07));
+        assertTrue(project.effects.stream().allMatch(effect->effect.volume==.5));
         SoundProjectStore.saveAdditions(project,manifest,revision,additions);
 
         var saved=JsonParser.parseString(Files.readString(manifest)).getAsJsonObject();
@@ -94,6 +94,30 @@ class SoundApplicatorTest {
         assertEquals(2,quarter.effectsAdded().size());
         assertTrue(quarter.effectsAdded().getFirst().start<160);
         assertTrue(quarter.effectsAdded().getLast().start>=160);
+    }
+
+    @Test void quietSourceReceivesMoreGainThanLoudSource() throws Exception {
+        try { org.junit.jupiter.api.Assumptions.assumeTrue(new ProcessBuilder("ffmpeg","-version")
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD).start().waitFor()==0); }
+        catch(java.io.IOException missing) { org.junit.jupiter.api.Assumptions.assumeTrue(false,"FFmpeg indisponível"); }
+        double loud=SoundLevel.effectVolume(tone("loud.wav",.5));
+        double quiet=SoundLevel.effectVolume(tone("quiet.wav",.02));
+        assertTrue(loud>=.25 && loud<quiet,"low-level sounds need more gain");
+        assertEquals(1,quiet);
+    }
+
+    private Path tone(String name,double amplitude) throws Exception {
+        byte[] samples=new byte[16000];
+        for(int i=0;i<8000;i++) {
+            short value=(short)(Math.sin(i*2*Math.PI*440/8000)*amplitude*Short.MAX_VALUE);
+            samples[i*2]=(byte)value;samples[i*2+1]=(byte)(value>>8);
+        }
+        var format=new javax.sound.sampled.AudioFormat(8000,16,1,true,false);
+        Path target=folder.resolve(name);
+        try(var stream=new javax.sound.sampled.AudioInputStream(new java.io.ByteArrayInputStream(samples),format,8000)) {
+            javax.sound.sampled.AudioSystem.write(stream,javax.sound.sampled.AudioFileFormat.Type.WAVE,target.toFile());
+        }
+        return target;
     }
 
     private static Path audio(Path root,String name) throws Exception {

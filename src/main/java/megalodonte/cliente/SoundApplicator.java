@@ -93,6 +93,7 @@ final class SoundApplicator {
             if(best!=null) { chosen.add(best);previous=best.sound.file(); }
         }
         var added = new ArrayList<VideoProject.SoundEffect>();
+        var levels=new java.util.HashMap<Path,Double>();
         for(Candidate candidate:chosen) {
             int scene=candidate.scene;
             var clip=project.clips.get(scene);
@@ -102,7 +103,7 @@ final class SoundApplicator {
             effect.start = Math.min(start + .4, start + clip.duration - .1);
             effect.offset = 0;
             effect.duration = Math.min(3, start + clip.duration - effect.start);
-            effect.volume = .07;
+            effect.volume = levels.computeIfAbsent(candidate.sound.file(),SoundLevel::effectVolume);
             effect.fadeIn = Math.min(.2, effect.duration / 4);
             effect.fadeOut = Math.min(.7, effect.duration / 3);
             effect.validate();
