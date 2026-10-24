@@ -36,6 +36,13 @@ class EditorViewTest {
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
                 assertEquals("1.0",pauseField.getText());
                 assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
+                for(String section:new String[]{"Efeitos visuais","Whisper","Prompt base","Geral"}) {
+                    var navigation=settingsRoot.lookupAll(".button").stream()
+                        .filter(n->n instanceof Button b && b.getText().equals(section)).map(n->(Button)n).findFirst().orElseThrow();
+                    navigation.fire();
+                    assertTrue(navigation.getStyle().contains("#2563eb"));
+                }
+                assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
                 folderField.setText("/diretorio-inexistente-para-teste");
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();

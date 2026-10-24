@@ -32,6 +32,10 @@ final class SettingsWindow implements AutoCloseable {
                 apply.accept(selected);stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
         }).register("cancelSettings",view -> stage.close())
+          .register("showGeneral",view -> showSection(view,"General"))
+          .register("showVisual",view -> showSection(view,"Visual"))
+          .register("showWhisper",view -> showSection(view,"Whisper"))
+          .register("showPrompt",view -> showSection(view,"Prompt"))
           .register("resetPrompt",view -> view.states().set("basePrompt",EditorSettings.defaultPrompt()))
           .register("chooseSounds",view -> {
               var chooser=new DirectoryChooser();chooser.setTitle("Selecionar biblioteca de sons");
@@ -54,9 +58,21 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("whisperBeamSize",Integer.toString(values.whisperBeamSize));
         session.states().set("whisperCpuThreads",Integer.toString(values.whisperCpuThreads));
         session.states().set("whisperVad",Boolean.toString(values.whisperVad));
-        stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),760,680));
-        stage.setMinWidth(740);stage.setMinHeight(520);
+        stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),940,680));
+        stage.setMinWidth(820);stage.setMinHeight(520);
+        showSection(session,"General");
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
+    }
+    private static void showSection(UiSession view,String selected) {
+        for(String section: new String[]{"General","Visual","Whisper","Prompt"}) {
+            boolean active=section.equals(selected);
+            view.states().set("show"+section,active);
+            var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();
+            button.setPrefWidth(176);
+            button.setStyle(active
+                    ? "-fx-background-color: #2563eb; -fx-text-fill: white; -fx-font-weight: bold;"
+                    : "-fx-background-color: transparent;");
+        }
     }
     void show() { stage.show(); }
     boolean showing() { return stage.isShowing(); }

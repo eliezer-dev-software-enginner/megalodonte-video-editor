@@ -30,24 +30,64 @@
       "type": "string",
       "initial": "1.0"
     },
-    "whisperModel": { "type": "string", "initial": "small" },
-    "whisperModelOptions": { "type": "string", "initial": "[]" },
-    "whisperLanguage": { "type": "string", "initial": "pt" },
-    "whisperLanguageOptions": { "type": "string", "initial": "[]" },
-    "whisperBeamSize": { "type": "string", "initial": "5" },
-    "whisperCpuThreads": { "type": "string", "initial": "4" },
-    "whisperVad": { "type": "string", "initial": "true" },
-    "whisperVadOptions": { "type": "string", "initial": "[]" },
+    "whisperModel": {
+      "type": "string",
+      "initial": "small"
+    },
+    "whisperModelOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
+    "whisperLanguage": {
+      "type": "string",
+      "initial": "pt"
+    },
+    "whisperLanguageOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
+    "whisperBeamSize": {
+      "type": "string",
+      "initial": "5"
+    },
+    "whisperCpuThreads": {
+      "type": "string",
+      "initial": "4"
+    },
+    "whisperVad": {
+      "type": "string",
+      "initial": "true"
+    },
+    "whisperVadOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
     "mensagem": {
       "type": "string",
       "initial": ""
+    },
+    "showGeneral": {
+      "type": "boolean",
+      "initial": true
+    },
+    "showVisual": {
+      "type": "boolean",
+      "initial": false
+    },
+    "showWhisper": {
+      "type": "boolean",
+      "initial": false
+    },
+    "showPrompt": {
+      "type": "boolean",
+      "initial": false
     }
   },
   "view": {
     "type": "Column",
     "props": {
-      "padding": 24,
-      "spacing": 14,
+      "padding": 20,
+      "spacing": 12,
       "fillWidth": true,
       "fillHeight": true
     },
@@ -62,169 +102,471 @@
         }
       },
       {
-        "type": "Scroll",
-        "id": "settingsScroll",
+        "type": "Row",
+        "id": "settingsBody",
         "props": {
+          "spacing": 18,
           "fillWidth": true,
           "fillHeight": true
         },
         "children": [
           {
             "type": "Column",
+            "id": "settingsSidebar",
             "props": {
-              "spacing": 12
+              "spacing": 9
             },
             "children": [
               {
                 "type": "Text",
                 "props": {
-                  "text": "OpenAI API key"
-                }
-              },
-              {
-                "type": "PasswordInput",
-                "id": "settingsApiKey",
-                "props": {
-                  "placeholder": "Sua chave da OpenAI",
-                  "height": 36,
-                  "width": 650
-                },
-                "bind": {
-                  "value": "apiKey"
-                }
-              },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "A chave é salva somente nas configurações locais deste aplicativo.",
-                  "wrapWidth": 640
-                }
-              },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "Biblioteca de sons"
-                }
-              },
-              {
-                "type": "Input",
-                "id": "soundsDirectoryInput",
-                "props": {
-                  "height": 36,
-                  "width": 650,
-                  "placeholder": "Diretório de sons e efeitos"
-                },
-                "bind": {
-                  "value": "soundsDirectory"
+                  "text": "SEÇÕES"
                 }
               },
               {
                 "type": "Button",
-                "id": "chooseSoundsButton",
+                "id": "settingsNavGeneral",
                 "props": {
-                  "text": "Selecionar pasta…",
-                  "height": 36
+                  "text": "Geral",
+                  "height": 40
                 },
                 "events": {
-                  "onClick": "chooseSounds"
-                }
-              },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
-                  "wrapWidth": 640
-                }
-              },
-              {
-                "type": "Text",
-                "props": { "text": "Efeito visual padrão para cenas novas" }
-              },
-              {
-                "type": "Select",
-                "id": "defaultVisualEffectInput",
-                "props": { "width": 240, "height": 36 },
-                "bind": { "value": "defaultVisualEffect", "items": "visualEffectOptions" }
-              },
-              {
-                "type": "Text",
-                "props": { "text": "Intensidade dos efeitos visuais (0,25 a 3)" }
-              },
-              {
-                "type": "Input",
-                "id": "visualEffectStrengthInput",
-                "props": { "width": 150, "height": 36, "placeholder": "Ex.: 1,5" },
-                "bind": { "value": "visualEffectStrength" }
-              },
-              {
-                "type": "Text",
-                "props": { "text": "1 mantém o movimento atual. Este valor é salvo no projeto para que a exportação reproduza a prévia.", "wrapWidth": 640 }
-              },
-              { "type": "Text", "style": { "fontSize": 18 }, "props": { "text": "Transcrição local com Whisper" } },
-              { "type": "Text", "props": { "text": "Modelo" } },
-              { "type": "Select", "id": "whisperModelInput", "props": { "width": 260, "height": 36 }, "bind": { "value": "whisperModel", "items": "whisperModelOptions" } },
-              { "type": "Text", "props": { "text": "Idioma" } },
-              { "type": "Select", "id": "whisperLanguageInput", "props": { "width": 260, "height": 36 }, "bind": { "value": "whisperLanguage", "items": "whisperLanguageOptions" } },
-              { "type": "Text", "props": { "text": "Busca (1 a 10 hipóteses)" } },
-              { "type": "Input", "id": "whisperBeamSizeInput", "props": { "width": 150, "height": 36, "placeholder": "5" }, "bind": { "value": "whisperBeamSize" } },
-              { "type": "Text", "props": { "text": "Threads de CPU (1 a 16)" } },
-              { "type": "Input", "id": "whisperCpuThreadsInput", "props": { "width": 150, "height": 36, "placeholder": "4" }, "bind": { "value": "whisperCpuThreads" } },
-              { "type": "Text", "props": { "text": "Filtro de silêncio (VAD)" } },
-              { "type": "Select", "id": "whisperVadInput", "props": { "width": 200, "height": 36 }, "bind": { "value": "whisperVad", "items": "whisperVadOptions" } },
-              { "type": "Text", "props": { "text": "Modelos maiores podem exigir mais memória e download na primeira execução.", "wrapWidth": 640 } },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "Pausa mínima para trocar de cena após a fala (segundos)"
-                }
-              },
-              {
-                "type": "Input",
-                "id": "pauseCutThresholdInput",
-                "props": {
-                  "height": 36,
-                  "width": 150,
-                  "placeholder": "1,0"
-                },
-                "bind": {
-                  "value": "pauseCutThreshold"
-                }
-              },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "Pausas menores mantêm o corte no meio do intervalo. Não cria cenas: o roteiro precisa indicar a transição.",
-                  "wrapWidth": 640
-                }
-              },
-              {
-                "type": "Text",
-                "props": {
-                  "text": "Prompt base da geração de vídeo"
-                }
-              },
-              {
-                "type": "TextArea",
-                "id": "basePromptInput",
-                "props": {
-                  "height": 260,
-                  "width": 650,
-                  "placeholder": "Instruções para o agente de IA"
-                },
-                "bind": {
-                  "value": "basePrompt"
+                  "onClick": "showGeneral"
                 }
               },
               {
                 "type": "Button",
-                "id": "resetPromptButton",
+                "id": "settingsNavVisual",
                 "props": {
-                  "text": "Restaurar prompt padrão",
-                  "height": 36
+                  "text": "Efeitos visuais",
+                  "height": 40
                 },
                 "events": {
-                  "onClick": "resetPrompt"
+                  "onClick": "showVisual"
                 }
+              },
+              {
+                "type": "Button",
+                "id": "settingsNavWhisper",
+                "props": {
+                  "text": "Whisper",
+                  "height": 40
+                },
+                "events": {
+                  "onClick": "showWhisper"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "settingsNavPrompt",
+                "props": {
+                  "text": "Prompt base",
+                  "height": 40
+                },
+                "events": {
+                  "onClick": "showPrompt"
+                }
+              }
+            ]
+          },
+          {
+            "type": "Scroll",
+            "id": "settingsScroll",
+            "props": {
+              "fillWidth": true,
+              "fillHeight": true
+            },
+            "children": [
+              {
+                "type": "Column",
+                "id": "settingsContent",
+                "props": {
+                  "padding": 16,
+                  "spacing": 14,
+                  "fillWidth": true
+                },
+                "children": [
+                  {
+                    "type": "Column",
+                    "id": "settingsGeneralPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showGeneral"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Geral"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Acesso à IA e biblioteca local de sons.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "OpenAI API key"
+                        }
+                      },
+                      {
+                        "type": "PasswordInput",
+                        "id": "settingsApiKey",
+                        "props": {
+                          "placeholder": "Sua chave da OpenAI",
+                          "height": 36,
+                          "width": 530
+                        },
+                        "bind": {
+                          "value": "apiKey"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "A chave é salva somente nas configurações locais deste aplicativo.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Biblioteca de sons"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "soundsDirectoryInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Diretório de sons e efeitos"
+                        },
+                        "bind": {
+                          "value": "soundsDirectory"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "chooseSoundsButton",
+                        "props": {
+                          "text": "Selecionar pasta…",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "chooseSounds"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "O agente poderá usar os arquivos desta pasta e de suas subpastas na montagem do vídeo.",
+                          "wrapWidth": 520
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "id": "settingsVisualPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showVisual"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Efeitos visuais"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Padrões para novas cenas e intensidade do projeto.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Efeito visual padrão para cenas novas"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "defaultVisualEffectInput",
+                        "props": {
+                          "width": 240,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "defaultVisualEffect",
+                          "items": "visualEffectOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Intensidade dos efeitos visuais (0,25 a 3)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "visualEffectStrengthInput",
+                        "props": {
+                          "width": 150,
+                          "height": 36,
+                          "placeholder": "Ex.: 1,5"
+                        },
+                        "bind": {
+                          "value": "visualEffectStrength"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "1 mantém o movimento atual. Este valor é salvo no projeto para que a exportação reproduza a prévia.",
+                          "wrapWidth": 520
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "id": "settingsWhisperPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showWhisper"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Whisper e sincronização"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Ajuste a transcrição local da narração.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 18
+                        },
+                        "props": {
+                          "text": "Transcrição local com Whisper"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Modelo"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "whisperModelInput",
+                        "props": {
+                          "width": 260,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "whisperModel",
+                          "items": "whisperModelOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Idioma"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "whisperLanguageInput",
+                        "props": {
+                          "width": 260,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "whisperLanguage",
+                          "items": "whisperLanguageOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Busca (1 a 10 hipóteses)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "whisperBeamSizeInput",
+                        "props": {
+                          "width": 150,
+                          "height": 36,
+                          "placeholder": "5"
+                        },
+                        "bind": {
+                          "value": "whisperBeamSize"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Threads de CPU (1 a 16)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "whisperCpuThreadsInput",
+                        "props": {
+                          "width": 150,
+                          "height": 36,
+                          "placeholder": "4"
+                        },
+                        "bind": {
+                          "value": "whisperCpuThreads"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Filtro de silêncio (VAD)"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "whisperVadInput",
+                        "props": {
+                          "width": 200,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "whisperVad",
+                          "items": "whisperVadOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Modelos maiores podem exigir mais memória e download na primeira execução.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Pausa mínima para trocar de cena após a fala (segundos)"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "pauseCutThresholdInput",
+                        "props": {
+                          "height": 36,
+                          "width": 150,
+                          "placeholder": "1,0"
+                        },
+                        "bind": {
+                          "value": "pauseCutThreshold"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Pausas menores mantêm o corte no meio do intervalo. Não cria cenas: o roteiro precisa indicar a transição.",
+                          "wrapWidth": 520
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "id": "settingsPromptPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showPrompt"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Prompt base"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Instruções usadas na geração do vídeo.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Prompt base da geração de vídeo"
+                        }
+                      },
+                      {
+                        "type": "TextArea",
+                        "id": "basePromptInput",
+                        "props": {
+                          "height": 260,
+                          "width": 530,
+                          "placeholder": "Instruções para o agente de IA"
+                        },
+                        "bind": {
+                          "value": "basePrompt"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "resetPromptButton",
+                        "props": {
+                          "text": "Restaurar prompt padrão",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "resetPrompt"
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -234,7 +576,7 @@
         "type": "Text",
         "id": "settingsMessage",
         "props": {
-          "wrapWidth": 650
+          "wrapWidth": 850
         },
         "bind": {
           "text": "mensagem"
