@@ -63,6 +63,7 @@ public final class VideoProject {
     }
     public VideoProject snapshot() {
         var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
+        copy.avatarDirectory = avatarDirectory;
         copy.visualEffectStrength = visualEffectStrength;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
@@ -72,6 +73,8 @@ public final class VideoProject {
     }
     public static final String ASPECT_RATIO = "16:9";
     public String script = "";
+    /** Optional avatar library chosen for this project; files remain in their original folder. */
+    public String avatarDirectory = "";
     public boolean animateImages;
     /** Shared intensity for visual effects; stored with the project so exports are reproducible. */
     public double visualEffectStrength = 1.0;
@@ -100,7 +103,8 @@ public final class VideoProject {
         requireRevision(absolute,expectedRevision);
         Path assets = absolute.getParent().resolve(absolute.getFileName() + ".assets"); Files.createDirectories(assets);
         Map<Path,String> savedAssets = new HashMap<>();
-        var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script); var scenes = new JsonArray();
+        var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script);
+        root.addProperty("avatarDirectory", avatarDirectory); var scenes = new JsonArray();
         for (Clip clip : clips) {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
             String image = copyAsset(clip.image, absolute, assets, savedAssets);
@@ -141,6 +145,8 @@ public final class VideoProject {
             if (root.get("version").getAsInt() != 1) throw new IllegalArgumentException("Versão incompatível");
             if (root.has("aspectRatio") && !ASPECT_RATIO.equals(root.get("aspectRatio").getAsString())) throw new IllegalArgumentException("Somente vídeos horizontais 16:9 são suportados");
             var project = new VideoProject(); project.script = root.get("script").getAsString();
+            if (root.has("avatarDirectory") && !root.get("avatarDirectory").isJsonNull())
+                project.avatarDirectory = root.get("avatarDirectory").getAsString();
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
             if (root.has("visualEffectStrength")) project.visualEffectStrength = root.get("visualEffectStrength").getAsDouble();
             validateVisualEffectStrength(project.visualEffectStrength);

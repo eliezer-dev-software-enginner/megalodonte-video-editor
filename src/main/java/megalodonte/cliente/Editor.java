@@ -24,14 +24,15 @@ public final class Editor extends ViewScript {
                 settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
-                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent),values -> {
+                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent),project.avatarDirectory,(values,avatarDirectory) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
+            project.avatarDirectory=avatarDirectory;
             if(!project.clips.isEmpty()) {
                 project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
-                if(projectFile!=null)saveProject();
             }
+            if(projectFile!=null)saveProject();
             if(project.clips.isEmpty())syncMotionSelection();
-            if(projectFile==null)message("Configurações salvas. Salve o projeto para manter sua intensidade visual.");
+            if(projectFile==null)message("Configurações salvas. Salve o projeto para manter a pasta de avatares e a intensidade visual.");
         });
         settingsWindow.show();
     }

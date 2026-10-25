@@ -5,6 +5,18 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
+    @Test void avatarFolderBelongsToProjectAndSurvivesSave() throws Exception {
+        var avatarFolder=Files.createDirectory(directory.resolve("meu-avatar"));
+        var first=VideoProject.fromScript("Cena");
+        first.avatarDirectory=SettingsWindow.validateAvatarDirectory(avatarFolder.toString());
+        assertEquals(avatarFolder.toString(),first.snapshot().avatarDirectory);
+        var file=directory.resolve("first.mvideo.json");first.save(file);
+        assertEquals(avatarFolder.toString(),VideoProject.load(file).avatarDirectory);
+        var second=VideoProject.fromScript("Outro vídeo");
+        assertEquals("",second.avatarDirectory);
+        assertEquals("",SettingsWindow.validateAvatarDirectory(" "));
+        assertThrows(IllegalArgumentException.class,()->SettingsWindow.validateAvatarDirectory(directory.resolve("inexistente").toString()));
+    }
     @Test void repeatedSaveReusesProjectAssetsWithoutGrowingNames() throws Exception {
         var source=directory.resolve("ressona-narracao-2026-10-24-a1fe5f19.mp3");
         Files.write(source,new byte[]{1,2,3});

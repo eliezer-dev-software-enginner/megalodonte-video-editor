@@ -5,14 +5,15 @@ import javafx.scene.Scene;
 import javafx.stage.*;
 import megalodonte.jsonc.*;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /** Native window host; every setting and control is defined by JSONC. */
 final class SettingsWindow implements AutoCloseable {
-    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values) throws IOException; }
+    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,String avatarDirectory) throws IOException; }
     private final Stage stage=new Stage();
     private final UiSession session;
-    SettingsWindow(Window owner,EditorSettings.Values values,Apply apply) {
+    SettingsWindow(Window owner,EditorSettings.Values values,String avatarDirectory,Apply apply) {
         stage.setTitle("Configurações · Megalodonte Video Editor");
         if(owner!=null) { stage.initOwner(owner); stage.initModality(Modality.WINDOW_MODAL); }
         else stage.initModality(Modality.APPLICATION_MODAL);
@@ -30,12 +31,13 @@ final class SettingsWindow implements AutoCloseable {
                     Boolean.parseBoolean(view.states().string("whisperVad").get()),
                     EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
-                apply.accept(selected);stage.close();
+                apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
         }).register("cancelSettings",view -> stage.close())
           .register("showGeneral",view -> showSection(view,"General"))
           .register("showVisual",view -> showSection(view,"Visual"))
           .register("showWhisper",view -> showSection(view,"Whisper"))
+          .register("showAvatar",view -> showSection(view,"Avatar"))
           .register("showPrompt",view -> showSection(view,"Prompt"))
           .register("resetPrompt",view -> view.states().set("basePrompt",EditorSettings.defaultPrompt()))
           .register("chooseSounds",view -> {
@@ -44,9 +46,16 @@ final class SettingsWindow implements AutoCloseable {
               catch(RuntimeException ignored) { }
               var selected=chooser.showDialog(stage);
               if(selected!=null) view.states().set("soundsDirectory",selected.toPath().toAbsolutePath().normalize().toString());
+          }).register("chooseAvatar",view -> {
+              var chooser=new DirectoryChooser();chooser.setTitle("Selecionar pasta de avatares do projeto");
+              try { chooser.setInitialDirectory(FileDialogs.existingFolder(Path.of(view.states().string("avatarDirectory").get())).toFile()); }
+              catch(RuntimeException ignored) { }
+              var selected=chooser.showDialog(stage);
+              if(selected!=null) view.states().set("avatarDirectory",selected.toPath().toAbsolutePath().normalize().toString());
           });
         session=UiDefinition.fromResource(SettingsWindow.class,"/views/settings.view.jsonc").open(actions);
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
+        session.states().set("avatarDirectory",avatarDirectory);
         session.states().set("basePrompt",values.basePrompt);
         session.states().set("pauseCutThreshold",Double.toString(values.pauseCutThreshold));
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
@@ -67,7 +76,7 @@ final class SettingsWindow implements AutoCloseable {
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
     }
     private static void showSection(UiSession view,String selected) {
-        for(String section: new String[]{"General","Visual","Whisper","Prompt"}) {
+        for(String section: new String[]{"General","Visual","Whisper","Avatar","Prompt"}) {
             boolean active=section.equals(selected);
             view.states().set("show"+section,active);
             var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();
@@ -76,6 +85,13 @@ final class SettingsWindow implements AutoCloseable {
                     ? "-fx-background-color: #2563eb; -fx-text-fill: white; -fx-font-weight: bold;"
                     : "-fx-background-color: transparent;");
         }
+    }
+    static String validateAvatarDirectory(String value) {
+        if(value==null || value.isBlank()) return "";
+        Path folder=Path.of(value.strip()).toAbsolutePath().normalize();
+        if(!Files.isDirectory(folder) || !Files.isReadable(folder))
+            throw new IllegalArgumentException("Escolha uma pasta de avatares existente e legível.");
+        return folder.toString();
     }
     void show() { stage.show(); }
     boolean showing() { return stage.isShowing(); }

@@ -78,6 +78,10 @@
       "type": "boolean",
       "initial": false
     },
+    "showAvatar": {
+      "type": "boolean",
+      "initial": false
+    },
     "showPrompt": {
       "type": "boolean",
       "initial": false
@@ -89,6 +93,10 @@
     "soundEffectPercentOptions": {
       "type": "string",
       "initial": "[]"
+    },
+    "avatarDirectory": {
+      "type": "string",
+      "initial": ""
     }
   },
   "view": {
@@ -162,6 +170,17 @@
                 },
                 "events": {
                   "onClick": "showWhisper"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "settingsNavAvatar",
+                "props": {
+                  "text": "Avatar",
+                  "height": 40
+                },
+                "events": {
+                  "onClick": "showAvatar"
                 }
               },
               {
@@ -535,6 +554,57 @@
                         "type": "Text",
                         "props": {
                           "text": "Pausas menores mantêm o corte no meio do intervalo. Não cria cenas: o roteiro precisa indicar a transição.",
+                          "wrapWidth": 520
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "id": "settingsAvatarPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showAvatar"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": { "fontSize": 20 },
+                        "props": { "text": "Avatar" }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Pasta de avatares deste projeto. Pode conter variações e subpastas.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "avatarDirectoryInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "/home/eliezer/Desktop/backup/imagens_para_uso/avatar-hibrido-triceratops"
+                        },
+                        "bind": { "value": "avatarDirectory" }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "chooseAvatarButton",
+                        "props": {
+                          "text": "Selecionar pasta…",
+                          "height": 36
+                        },
+                        "events": { "onClick": "chooseAvatar" }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "O caminho é salvo no arquivo do projeto; as imagens continuam na pasta original. Deixe vazio se este projeto não usar avatar.",
                           "wrapWidth": 520
                         }
                       }
