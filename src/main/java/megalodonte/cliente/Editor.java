@@ -39,6 +39,7 @@ public final class Editor extends ViewScript {
     private final FileDialogs dialogs = new FileDialogs();
     private final LastProjectStore lastProject = new LastProjectStore();
     private final AudioPreview audio = new AudioPreview();
+    private AvatarPreview avatarPreview;
     private volatile boolean disposed;
     private VideoExporter exporter;
     private Thread exportThread;
@@ -237,7 +238,9 @@ public final class Editor extends ViewScript {
         var kind=track==project.narration ? FileDialogs.Kind.NARRATION : FileDialogs.Kind.MUSIC;
         var files=chooseFiles(kind); if(files.isEmpty()) return;
         java.io.File file=files.getFirst().toFile();
-        pausePlayback(); track.file = file.getAbsolutePath(); refreshAudio(); message("Áudio anexado. Ajuste os volumes e clique em Aplicar volumes."); audio.load(project,this::audioError);
+        pausePlayback(); track.file = file.getAbsolutePath(); refreshAudio(); audio.load(project,this::audioError);
+        if(projectFile!=null) saveProject();
+        else message("Áudio anexado. Salve o projeto para preservar o arquivo de narração.");
     }
     public void removeNarration() { if(generationBusy()) return; pausePlayback(); project.narration.file=""; refreshAudio(); audio.load(project,this::audioError); }
     public void removeMusic() { if(generationBusy()) return; pausePlayback(); project.music.file=""; refreshAudio(); audio.load(project,this::audioError); }
@@ -323,6 +326,12 @@ public final class Editor extends ViewScript {
         int selected=index();var clip=selected();if(clip==null)return;
         double start=0;for(int i=0;i<selected;i++)start+=project.clips.get(i).duration;
         ((ImagePreview)component("preview")).setVisualEffect(clip.visualEffect,selected,playhead-start,project.visualEffectStrength);
+        String error=avatarPreview().show(project.avatarDirectory,clip.avatar,!clip.image.isBlank());
+        if(error!=null)message(error);
+    }
+    private AvatarPreview avatarPreview() {
+        if(avatarPreview==null)avatarPreview=new AvatarPreview((ImagePreview)component("preview"));
+        return avatarPreview;
     }
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
@@ -354,7 +363,11 @@ public final class Editor extends ViewScript {
     }
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
-        timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = VideoProject.fromScript(text("roteiro")); project.animateImages=previous.animateImages;
+        VideoProject parsed;
+        try { parsed=VideoProject.fromScript(text("roteiro")); }
+        catch(IllegalArgumentException e) { message(e.getMessage()); return; }
+        timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = parsed; project.animateImages=previous.animateImages;
+        project.avatarDirectory=previous.avatarDirectory;
         project.visualEffectStrength=previous.visualEffectStrength;
         if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
@@ -420,7 +433,7 @@ public final class Editor extends ViewScript {
         set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + effectLabel + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
         set("duracao", clip == null ? "5" : Double.toString(clip.duration));
         if(clip!=null)refreshVisualPreview();
-        else ((ImagePreview)component("preview")).setVisualEffect("",0,0);
+        else { ((ImagePreview)component("preview")).setVisualEffect("",0,0);avatarPreview().show("","",false); }
     }
     public void applyDuration() { if(generationBusy()) return;
         var clip = selected(); if (clip == null) return;

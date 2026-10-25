@@ -17,6 +17,31 @@ class VideoExporterTest {
         try { Assumptions.assumeTrue(new ProcessBuilder("ffmpeg","-version").redirectOutput(ProcessBuilder.Redirect.DISCARD).start().waitFor()==0); }
         catch(IOException e) { Assumptions.assumeTrue(false,"FFmpeg necessário para testes de exportação"); }
     }
+    @Test void avatarAppearsOverSceneAndCanExportWithoutBackgroundImage() throws Exception {
+        var folder=Files.createDirectories(directory.resolve("avatars/falando"));
+        var portrait=new BufferedImage(100,100,BufferedImage.TYPE_INT_ARGB);
+        var graphics=portrait.createGraphics();graphics.setColor(Color.RED);graphics.fillRect(0,0,100,100);graphics.dispose();
+        ImageIO.write(portrait,"png",folder.resolve("falando_boca-aberta.png").toFile());
+        var project=VideoProject.fromScript("#falando_boca-aberta.png\nCena narrada.");
+        project.avatarDirectory=folder.getParent().toString();project.clips.getFirst().duration=.3;
+        var output=directory.resolve("avatar.mp4");new VideoExporter(320,180).export(project,output,m->{});
+        byte[] frame=binaryCommand("ffmpeg","-v","error","-ss","0.1","-i",output.toString(),"-frames:v","1","-f","image2pipe","-vcodec","png","pipe:1");
+        var image=ImageIO.read(new ByteArrayInputStream(frame));
+        assertTrue(new Color(image.getRGB(260,100)).getRed()>150,"Avatar should occupy the right side");
+        assertTrue(new Color(image.getRGB(20,20)).getBlue()>30,"Background should remain visible");
+        project.avatarDirectory=directory.resolve("missing").toString();
+        assertThrows(IOException.class,()->new VideoExporter(320,180).export(project,output,m->{}));
+    }
+    @Test void refusesToSilentlyCutLongNarration() throws Exception {
+        var project=VideoProject.fromScript("Cena");
+        project.clips.getFirst().image=image("cena.png",Color.BLUE).toString();
+        project.clips.getFirst().duration=1;
+        project.narration.file=wave("longa.wav",220,.2,3).toString();
+        var output=directory.resolve("existing.mp4");Files.writeString(output,"original");
+        var error=assertThrows(IOException.class,()->new VideoExporter(320,180).export(project,output,m->{}));
+        assertTrue(error.getMessage().contains("Sincronize com Whisper"));
+        assertEquals("original",Files.readString(output));
+    }
     @Test void exportsFullHdOrderedScenesWithNarrationAndQuietLoopingMusic() throws Exception {
         var project=VideoProject.fromScript("Vermelho\n\nAzul");
         project.clips.get(0).image=image("primeira ' imagem.png",Color.RED).toString();

@@ -1,6 +1,10 @@
 package megalodonte.cliente;
 
 import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -19,16 +23,32 @@ public final class VideoExporter {
         if(project.clips.isEmpty()) throw new IOException("Crie cenas e anexe as imagens antes de exportar.");
         VideoProject.validateVisualEffectStrength(project.visualEffectStrength);
         Path target=output.toAbsolutePath().normalize();
+        var avatars=new ArrayList<Path>(project.clips.size());
         for(var clip:project.clips) {
-            if(clip.image.isBlank() || !Files.isRegularFile(Path.of(clip.image))) throw new IOException("Anexe uma imagem para cada cena antes de exportar.");
+            if(clip.image.isBlank() && clip.avatar.isBlank()) throw new IOException("Anexe uma imagem ou escolha um avatar para cada cena antes de exportar.");
+            if(!clip.image.isBlank() && !Files.isRegularFile(Path.of(clip.image))) throw new IOException("Imagem da cena ausente: "+clip.image);
             if(!Double.isFinite(clip.duration) || clip.duration<.1 || clip.duration>3600) throw new IOException("Duração de cena inválida.");
             try { VideoProject.validateVisualEffect(clip.visualEffect); } catch(IllegalArgumentException e) { throw new IOException(e.getMessage(),e); }
-            rejectOutputSource(target,clip.image);
+            if(!clip.image.isBlank())rejectOutputSource(target,clip.image);
+            var avatar=AvatarFiles.resolve(project.avatarDirectory,clip.avatar);
+            if(avatar!=null)rejectOutputSource(target,avatar.toString());
+            avatars.add(avatar);
         }
         for(var track:List.of(project.narration,project.music)) {
             double maxGain=track==project.narration ? VideoProject.MAX_NARRATION_GAIN : 1;
             if(!Double.isFinite(track.volume) || track.volume<0 || track.volume>maxGain) throw new IOException("Volume inválido.");
             if(!track.file.isBlank()) { if(!Files.isRegularFile(Path.of(track.file))) throw new IOException("Áudio ausente: "+track.file); rejectOutputSource(target,track.file); }
+        }
+        if(!project.narration.file.isBlank()) {
+            Process probe=new ProcessBuilder("ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",project.narration.file).start();
+            String value;
+            try { value=new String(probe.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).strip();
+                if(probe.waitFor()!=0) throw new IOException("Não foi possível medir a duração da narração.");
+            } catch(InterruptedException e) { Thread.currentThread().interrupt(); throw new IOException("Medição da narração interrompida.",e); }
+            double narrationDuration;
+            try { narrationDuration=Double.parseDouble(value); } catch(NumberFormatException e) { throw new IOException("Duração da narração inválida.",e); }
+            if(narrationDuration>project.duration()+1)
+                throw new IOException(String.format(Locale.ROOT,"A narração dura %.1fs, mas as cenas somam %.1fs. Sincronize com Whisper antes de exportar para evitar cortar o vídeo.",narrationDuration,project.duration()));
         }
         for(var effect:project.effects) {
             try { effect.validate(); } catch(IllegalArgumentException e) { throw new IOException(e.getMessage(),e); }
@@ -42,8 +62,30 @@ public final class VideoExporter {
             for(int i=0;i<project.clips.size();i++) {
                 checkCancelled(); var clip=project.clips.get(i);
                 progress.accept("Exportando cena "+(i+1)+" de "+project.clips.size()+"…");
-                var image=ImageIO.read(Path.of(clip.image).toFile());
-                if(image==null) throw new IOException("Imagem inválida: "+clip.image);
+                BufferedImage image;
+                if(clip.image.isBlank()) {
+                    image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
+                    var graphics=image.createGraphics();graphics.setColor(new Color(21,40,58));graphics.fillRect(0,0,width,height);graphics.dispose();
+                } else {
+                    image=ImageIO.read(Path.of(clip.image).toFile());
+                    if(image==null) throw new IOException("Imagem inválida: "+clip.image);
+                }
+                boolean staticAvatar=avatars.get(i)!=null && !project.animateImages && clip.visualEffect.isBlank();
+                if(staticAvatar) {
+                    BufferedImage portrait=ImageIO.read(avatars.get(i).toFile());
+                    if(portrait==null) throw new IOException("Avatar inválido: "+avatars.get(i));
+                    BufferedImage composed=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
+                    Graphics2D graphics=composed.createGraphics();
+                    graphics.setColor(Color.BLACK);graphics.fillRect(0,0,width,height);
+                    graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    double fit=Math.min((double)width/image.getWidth(),(double)height/image.getHeight());
+                    int backgroundWidth=(int)Math.round(image.getWidth()*fit),backgroundHeight=(int)Math.round(image.getHeight()*fit);
+                    graphics.drawImage(image,(width-backgroundWidth)/2,(height-backgroundHeight)/2,backgroundWidth,backgroundHeight,null);
+                    int avatarHeight=(int)Math.round(height*.72);
+                    int avatarWidth=(int)Math.round((double)portrait.getWidth()*avatarHeight/portrait.getHeight());
+                    graphics.drawImage(portrait,width-avatarWidth-(int)Math.round(width*.025),height-avatarHeight,avatarWidth,avatarHeight,null);
+                    graphics.dispose();image.flush();portrait.flush();image=composed;
+                }
                 var frame=work.resolve("frame.png"); ImageIO.write(image,"png",frame.toFile()); image.flush();
                 String name=String.format(Locale.ROOT,"scene-%06d.mp4",i);
                 long frames=Math.max(1,Math.round(clip.duration*30));
@@ -68,9 +110,14 @@ public final class VideoExporter {
                     filter+=",crop="+(width-marginX)+":"+(height-marginY)
                         +":x='"+(marginX/2)+"+"+(marginX/4)+"*sin(n*0.31)':y='"+(marginY/2)+"+"+(marginY/4)+"*cos(n*0.27)',scale="+width+":"+height+",setsar=1";
                 }
-                var command=command(); Collections.addAll(command,"-loop","1","-framerate","30","-i",frame.toString(),
-                    "-frames:v",Long.toString(frames),
-                    "-vf",filter,
+                var command=command(); Collections.addAll(command,"-loop","1","-framerate","30","-i",frame.toString());
+                if(avatars.get(i)!=null && !staticAvatar) {
+                    Collections.addAll(command,"-loop","1","-framerate","30","-i",avatars.get(i).toString());
+                    String avatarFilter="[0:v]"+filter+"[background];[1:v]scale=-1:"+Math.round(height*.72)+":flags=lanczos[avatar];"
+                            +"[background][avatar]overlay=x=W-w-"+Math.round(width*.025)+":y=H-h:format=auto,format=yuv420p[video]";
+                    Collections.addAll(command,"-filter_complex",avatarFilter,"-map","[video]");
+                } else Collections.addAll(command,"-vf",filter);
+                Collections.addAll(command,"-frames:v",Long.toString(frames),
                     "-c:v","libx264","-preset","fast","-crf","20","-pix_fmt","yuv420p","-threads","2","-an",work.resolve(name).toString());
                 run(command,work); concat.append("file '").append(name).append("'\n");
             }

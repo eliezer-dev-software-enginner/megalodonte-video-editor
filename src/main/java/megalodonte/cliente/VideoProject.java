@@ -11,6 +11,8 @@ public final class VideoProject {
     public static final class Clip {
         public String text;
         public String image = "";
+        /** Exact PNG filename selected by a #avatar.png script marker. */
+        public String avatar = "";
         public String visualEffect = "";
         public double duration = 5;
         public Clip(String text) { this.text = text; }
@@ -67,7 +69,7 @@ public final class VideoProject {
         copy.visualEffectStrength = visualEffectStrength;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
-        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
+        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.avatar = clip.avatar; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
         for(var effect:effects) copy.effects.add(effect.copy());
         return copy;
     }
@@ -81,7 +83,17 @@ public final class VideoProject {
     public final List<Clip> clips = new ArrayList<>();
     public static VideoProject fromScript(String script) {
         var project = new VideoProject(); project.script = script;
-        for (String paragraph : script.strip().split("\\R\\s*\\R")) if (!paragraph.isBlank()) project.clips.add(new Clip(paragraph.strip()));
+        for (String paragraph : script.strip().split("\\R\\s*\\R")) if (!paragraph.isBlank()) {
+            String scene=paragraph.strip();
+            var lines=scene.split("\\R",2);
+            if(lines[0].startsWith("#")) {
+                if(lines.length!=2 || !lines[0].matches("#[\\p{L}\\p{N}_-]+\\.png"))
+                    throw new IllegalArgumentException("Marcação de avatar inválida: " + lines[0]);
+                var clip=new Clip(lines[1].strip()); clip.avatar=lines[0].substring(1);
+                if(clip.text.isBlank()) throw new IllegalArgumentException("A cena com avatar precisa de narração.");
+                project.clips.add(clip);
+            } else project.clips.add(new Clip(scene));
+        }
         return project;
     }
     public double duration() { return clips.stream().mapToDouble(clip -> clip.duration).sum(); }
@@ -108,7 +120,7 @@ public final class VideoProject {
         for (Clip clip : clips) {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
             String image = copyAsset(clip.image, absolute, assets, savedAssets);
-            scene.addProperty("image", image); scenes.add(scene);
+            scene.addProperty("image", image); scene.addProperty("avatar", clip.avatar); scenes.add(scene);
             validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
@@ -156,6 +168,7 @@ public final class VideoProject {
                 if (!Double.isFinite(clip.duration) || clip.duration < .1 || clip.duration > 3600) throw new IllegalArgumentException("Duração inválida");
                 String image = scene.get("image").getAsString();
                 clip.image = resolveAsset(image,file);
+                clip.avatar=scene.has("avatar") ? scene.get("avatar").getAsString() : "";
                 clip.visualEffect=scene.has("visualEffect") ? scene.get("visualEffect").getAsString() : "";
                 validateVisualEffect(clip.visualEffect);
                 project.clips.add(clip);

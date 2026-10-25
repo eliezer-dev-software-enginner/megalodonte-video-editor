@@ -5,6 +5,21 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
+    @Test void avatarMarkersAreExcludedFromNarrationAndResolveInSubfolders() throws Exception {
+        var folder=Files.createDirectories(directory.resolve("avatares/falando"));
+        Files.write(folder.resolve("falando_boca-aberta.png"),new byte[]{1});
+        var project=VideoProject.fromScript("#falando_boca-aberta.png\nOlá.\n\n#falando_boca-aberta.png\nOutra cena.");
+        project.avatarDirectory=directory.resolve("avatares").toString();
+        assertEquals(2,project.clips.size());
+        assertEquals("Olá.",project.clips.getFirst().text);
+        assertEquals("falando_boca-aberta.png",project.clips.getFirst().avatar);
+        assertEquals(folder.resolve("falando_boca-aberta.png"),AvatarFiles.resolve(project.avatarDirectory,project.clips.getFirst().avatar));
+        var file=directory.resolve("avatar.mvideo.json");project.save(file);
+        var restored=VideoProject.load(file);
+        assertEquals(project.clips.getFirst().avatar,restored.snapshot().clips.getFirst().avatar);
+        assertEquals("Olá.",restored.clips.getFirst().text);
+        assertThrows(IllegalArgumentException.class,()->VideoProject.fromScript("#inexistente.jpg\nCena"));
+    }
     @Test void avatarFolderBelongsToProjectAndSurvivesSave() throws Exception {
         var avatarFolder=Files.createDirectory(directory.resolve("meu-avatar"));
         var first=VideoProject.fromScript("Cena");

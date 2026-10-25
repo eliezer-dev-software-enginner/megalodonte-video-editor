@@ -110,7 +110,8 @@ class EditorViewTest {
                 assertNotNull(previewFrame.getClip(),"The 16:9 preview frame must clip animated image movement");
                 assertEquals(previewFrame.getWidth(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getWidth(),.01);
                 assertEquals(previewFrame.getHeight(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getHeight(),.01);
-                var overlay=(javafx.scene.canvas.Canvas)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().getLast();
+                var overlay=(javafx.scene.canvas.Canvas)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().stream()
+                    .filter(javafx.scene.canvas.Canvas.class::isInstance).findFirst().orElseThrow();
                 preview.setVisualEffect("particles",0,0);
                 var first=overlay.snapshot(null,null);preview.setVisualEffect("particles",0,3);
                 var later=overlay.snapshot(null,null);int changed=0;
