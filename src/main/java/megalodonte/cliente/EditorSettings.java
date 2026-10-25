@@ -8,7 +8,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 
 /** Shared local editor preferences; credentials are never written to project manifests. */
 final class EditorSettings {
-    static final String DEFAULT_SOUNDS = "/home/eliezer/Desktop/backup/sounds";
+    static final String DEFAULT_SOUNDS = "";
     static final double DEFAULT_PAUSE_CUT_THRESHOLD = 1.0;
     static final class Values {
         final String apiKey, soundsDirectory, basePrompt;
@@ -19,6 +19,7 @@ final class EditorSettings {
         final int whisperBeamSize, whisperCpuThreads;
         final boolean whisperVad;
         final int soundEffectPercent;
+        final String pythonExecutable, ffmpegExecutable, ffprobeExecutable, whisperScriptsDirectory, whisperModelsDirectory;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
         }
@@ -38,6 +39,15 @@ final class EditorSettings {
         Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
                String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
                int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
+                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,
+                    "","","","","");
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
+               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
+               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
+               String whisperScriptsDirectory,String whisperModelsDirectory) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
             this.defaultVisualEffect=defaultVisualEffect;
@@ -45,6 +55,9 @@ final class EditorSettings {
             this.whisperModel=whisperModel;this.whisperLanguage=whisperLanguage;
             this.whisperBeamSize=whisperBeamSize;this.whisperCpuThreads=whisperCpuThreads;this.whisperVad=whisperVad;
             this.soundEffectPercent=soundEffectPercent;
+            this.pythonExecutable=pythonExecutable;this.ffmpegExecutable=ffmpegExecutable;
+            this.ffprobeExecutable=ffprobeExecutable;this.whisperScriptsDirectory=whisperScriptsDirectory;
+            this.whisperModelsDirectory=whisperModelsDirectory;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -75,26 +88,39 @@ final class EditorSettings {
             int soundEffectPercent=json.has("soundEffectPercent")?json.get("soundEffectPercent").getAsInt():100;
             validateWhisper(model,language,beam,threads);
             validateSoundEffectPercent(soundEffectPercent);
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent,
+                    value(json,"pythonExecutable",""),value(json,"ffmpegExecutable",""),value(json,"ffprobeExecutable",""),
+                    value(json,"whisperScriptsDirectory",""),value(json,"whisperModelsDirectory",""));
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
-        Path directory=validateSounds(values.soundsDirectory);
+        String directory=values.soundsDirectory.isBlank() ? "" : validateSounds(values.soundsDirectory).toString();
         if(values.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
         validatePauseCutThreshold(values.pauseCutThreshold);
         validateVisualEffect(values.defaultVisualEffect);
         VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
         validateWhisper(values.whisperModel,values.whisperLanguage,values.whisperBeamSize,values.whisperCpuThreads);
         validateSoundEffectPercent(values.soundEffectPercent);
-        write(new Values(values.apiKey,directory.toString(),values.basePrompt,values.pauseCutThreshold,
+        String python=ExternalTools.validateExecutable(values.pythonExecutable,"Python");
+        String ffmpeg=ExternalTools.validateExecutable(values.ffmpegExecutable,"FFmpeg");
+        String ffprobe=ExternalTools.validateExecutable(values.ffprobeExecutable,"FFprobe");
+        String scripts=ExternalTools.validateDirectory(values.whisperScriptsDirectory,"scripts do Whisper");
+        String models=ExternalTools.validateDirectory(values.whisperModelsDirectory,"modelos do Whisper");
+        if(!scripts.isBlank() && (!Files.isRegularFile(Path.of(scripts,"tools","transcribe_narration.py")) ||
+                !Files.isRegularFile(Path.of(scripts,"tools","sync_narration.py"))))
+            throw new IllegalArgumentException("A pasta dos scripts deve conter tools/transcribe_narration.py e tools/sync_narration.py.");
+        write(new Values(values.apiKey,directory,values.basePrompt,values.pauseCutThreshold,
                 values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
-                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent));
+                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent,
+                python,ffmpeg,ffprobe,scripts,models));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
         var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold,
                 current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
-                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent));
+                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent,
+                current.pythonExecutable,current.ffmpegExecutable,current.ffprobeExecutable,
+                current.whisperScriptsDirectory,current.whisperModelsDirectory));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
@@ -107,6 +133,11 @@ final class EditorSettings {
         json.addProperty("whisperBeamSize",values.whisperBeamSize);json.addProperty("whisperCpuThreads",values.whisperCpuThreads);
         json.addProperty("whisperVad",values.whisperVad);
         json.addProperty("soundEffectPercent",values.soundEffectPercent);
+        json.addProperty("pythonExecutable",values.pythonExecutable);
+        json.addProperty("ffmpegExecutable",values.ffmpegExecutable);
+        json.addProperty("ffprobeExecutable",values.ffprobeExecutable);
+        json.addProperty("whisperScriptsDirectory",values.whisperScriptsDirectory);
+        json.addProperty("whisperModelsDirectory",values.whisperModelsDirectory);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
             try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }

@@ -97,6 +97,30 @@
     "avatarDirectory": {
       "type": "string",
       "initial": ""
+    },
+    "pythonExecutable": {
+      "type": "string",
+      "initial": ""
+    },
+    "ffmpegExecutable": {
+      "type": "string",
+      "initial": ""
+    },
+    "ffprobeExecutable": {
+      "type": "string",
+      "initial": ""
+    },
+    "whisperScriptsDirectory": {
+      "type": "string",
+      "initial": ""
+    },
+    "whisperModelsDirectory": {
+      "type": "string",
+      "initial": ""
+    },
+    "showTools": {
+      "type": "boolean",
+      "initial": false
     }
   },
   "view": {
@@ -170,6 +194,17 @@
                 },
                 "events": {
                   "onClick": "showWhisper"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "settingsNavTools",
+                "props": {
+                  "text": "Ferramentas",
+                  "height": 40
+                },
+                "events": {
+                  "onClick": "showTools"
                 }
               },
               {
@@ -561,6 +596,125 @@
                   },
                   {
                     "type": "Column",
+                    "id": "settingsToolsPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showTools"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Ferramentas locais"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Deixe um campo vazio para detectar automaticamente. Caminhos específicos permitem usar outras instalações no seu computador.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Python para Whisper"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "pythonExecutableInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Ex.: /caminho/venv/bin/python"
+                        },
+                        "bind": {
+                          "value": "pythonExecutable"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "FFmpeg para exportação e efeitos"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "ffmpegExecutableInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Ex.: /usr/bin/ffmpeg"
+                        },
+                        "bind": {
+                          "value": "ffmpegExecutable"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "FFprobe para medir narração"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "ffprobeExecutableInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Ex.: /usr/bin/ffprobe"
+                        },
+                        "bind": {
+                          "value": "ffprobeExecutable"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Pasta do aplicativo que contém tools/"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "whisperScriptsDirectoryInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Automático: pasta do editor"
+                        },
+                        "bind": {
+                          "value": "whisperScriptsDirectory"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Cache dos modelos Whisper"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "whisperModelsDirectoryInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Automático: .local-asr/models"
+                        },
+                        "bind": {
+                          "value": "whisperModelsDirectory"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
                     "id": "settingsAvatarPanel",
                     "props": {
                       "spacing": 12,
@@ -572,8 +726,12 @@
                     "children": [
                       {
                         "type": "Text",
-                        "style": { "fontSize": 20 },
-                        "props": { "text": "Avatar" }
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Avatar"
+                        }
                       },
                       {
                         "type": "Text",
@@ -590,7 +748,9 @@
                           "width": 530,
                           "placeholder": "/home/eliezer/Desktop/backup/imagens_para_uso/avatar-hibrido-triceratops"
                         },
-                        "bind": { "value": "avatarDirectory" }
+                        "bind": {
+                          "value": "avatarDirectory"
+                        }
                       },
                       {
                         "type": "Button",
@@ -599,7 +759,9 @@
                           "text": "Selecionar pasta…",
                           "height": 36
                         },
-                        "events": { "onClick": "chooseAvatar" }
+                        "events": {
+                          "onClick": "chooseAvatar"
+                        }
                       },
                       {
                         "type": "Text",

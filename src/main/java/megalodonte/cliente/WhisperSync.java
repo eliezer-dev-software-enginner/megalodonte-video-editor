@@ -16,6 +16,8 @@ final class WhisperSync {
     private final Path project;
     private final Path scriptsRoot;
     private final Path python;
+    private final String ffprobe;
+    private final String modelsDirectory;
     private final double pauseCutThreshold;
     private final String model, language;
     private final int beamSize, cpuThreads;
@@ -29,17 +31,23 @@ final class WhisperSync {
                 settings.whisperBeamSize,settings.whisperCpuThreads);
         this.model=settings.whisperModel;this.language=settings.whisperLanguage;
         this.beamSize=settings.whisperBeamSize;this.cpuThreads=settings.whisperCpuThreads;this.vad=settings.whisperVad;
-        this.scriptsRoot = findScriptsRoot();
-        this.python = findPython(scriptsRoot);
+        this.scriptsRoot = settings.whisperScriptsDirectory.isBlank() ? findScriptsRoot() : Path.of(settings.whisperScriptsDirectory);
+        if(!Files.isRegularFile(scriptsRoot.resolve("tools/transcribe_narration.py")) ||
+                !Files.isRegularFile(scriptsRoot.resolve("tools/sync_narration.py")))
+            throw new IOException("A pasta configurada não contém os scripts do Whisper.");
+        this.python = settings.pythonExecutable.isBlank() ? findPython(scriptsRoot) : Path.of(settings.pythonExecutable);
+        this.ffprobe=ExternalTools.command(settings.ffprobeExecutable,"ffprobe");
+        this.modelsDirectory=settings.whisperModelsDirectory;
     }
 
     void run(Consumer<String> progress) throws IOException, InterruptedException {
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/transcribe_narration.py").toString(), project.toString(),
                         "--model",model,"--language",language,"--beam-size",Integer.toString(beamSize),
-                        "--cpu-threads",Integer.toString(cpuThreads),"--vad",Boolean.toString(vad)),
+                        "--cpu-threads",Integer.toString(cpuThreads),"--vad",Boolean.toString(vad),
+                        "--model-cache",modelsDirectory.isBlank() ? scriptsRoot.resolve(".local-asr/models").toString() : modelsDirectory),
                 progress, "Whisper falhou ao transcrever o áudio.");
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/sync_narration.py").toString(), project.toString(),
-                        "--pause-cut-threshold",Double.toString(pauseCutThreshold),"--apply"),
+                        "--pause-cut-threshold",Double.toString(pauseCutThreshold),"--ffprobe",ffprobe,"--apply"),
                 progress, "Não foi possível alinhar a narração ao roteiro.");
     }
 

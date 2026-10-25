@@ -14,10 +14,16 @@ import java.util.function.Consumer;
 /** Local MP4 exporter. ProcessBuilder arguments never pass through a shell. */
 public final class VideoExporter {
     private final int width, height;
+    private final String ffmpeg, ffprobe;
     private volatile boolean cancelled;
     private volatile Process process;
-    public VideoExporter() { this(1920,1080); }
-    VideoExporter(int width,int height) { this.width=width; this.height=height; }
+    public VideoExporter() { this(1920,1080,"",""); }
+    public VideoExporter(String ffmpeg,String ffprobe) { this(1920,1080,ffmpeg,ffprobe); }
+    VideoExporter(int width,int height) { this(width,height,"",""); }
+    VideoExporter(int width,int height,String ffmpeg,String ffprobe) {
+        this.width=width;this.height=height;
+        this.ffmpeg=ExternalTools.command(ffmpeg,"ffmpeg");this.ffprobe=ExternalTools.command(ffprobe,"ffprobe");
+    }
     public void cancel() { cancelled=true; var running=process; if(running!=null) running.destroyForcibly(); }
     public void export(VideoProject project, Path output, Consumer<String> progress) throws IOException {
         if(project.clips.isEmpty()) throw new IOException("Crie cenas e anexe as imagens antes de exportar.");
@@ -40,7 +46,7 @@ public final class VideoExporter {
             if(!track.file.isBlank()) { if(!Files.isRegularFile(Path.of(track.file))) throw new IOException("Áudio ausente: "+track.file); rejectOutputSource(target,track.file); }
         }
         if(!project.narration.file.isBlank()) {
-            Process probe=new ProcessBuilder("ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",project.narration.file).start();
+            Process probe=new ProcessBuilder(ffprobe,"-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",project.narration.file).start();
             String value;
             try { value=new String(probe.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).strip();
                 if(probe.waitFor()!=0) throw new IOException("Não foi possível medir a duração da narração.");
@@ -173,8 +179,8 @@ public final class VideoExporter {
         }
         return result.toString();
     }
-    private static ArrayList<String> command() {
-        return new ArrayList<>(List.of("ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y","-filter_threads","1","-filter_complex_threads","1"));
+    private ArrayList<String> command() {
+        return new ArrayList<>(List.of(ffmpeg,"-hide_banner","-loglevel","error","-nostdin","-y","-filter_threads","1","-filter_complex_threads","1"));
     }
     private void run(List<String> command,Path work) throws IOException {
         checkCancelled(); Path log=work.resolve("ffmpeg.log");
@@ -184,7 +190,7 @@ public final class VideoExporter {
             if(code!=0) { String error=Files.readString(log); throw new IOException("FFmpeg: "+error.substring(Math.max(0,error.length()-1200))); }
         } catch(InterruptedException e) { Thread.currentThread().interrupt(); cancel(); throw new CancellationException("Exportação cancelada."); }
         catch(IOException e) {
-            if(process==null) throw new IOException("Não foi possível iniciar o FFmpeg. Instale-o e disponibilize o comando ffmpeg no PATH.",e);
+            if(process==null) throw new IOException("Não foi possível iniciar o FFmpeg. Verifique o executável em Configurações → Ferramentas.",e);
             throw e;
         } finally {
             var running=process;

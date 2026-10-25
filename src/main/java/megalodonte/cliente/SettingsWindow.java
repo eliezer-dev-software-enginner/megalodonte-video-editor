@@ -20,7 +20,8 @@ final class SettingsWindow implements AutoCloseable {
         var actions=new Actions().register("saveSettings",view -> {
             try {
                 var selected=new EditorSettings.Values(view.states().string("apiKey").get().strip(),
-                    EditorSettings.validateSounds(view.states().string("soundsDirectory").get()).toString(),
+                    view.states().string("soundsDirectory").get().isBlank() ? "" :
+                            EditorSettings.validateSounds(view.states().string("soundsDirectory").get()).toString(),
                     view.states().string("basePrompt").get(),
                     EditorSettings.parsePauseCutThreshold(view.states().string("pauseCutThreshold").get()),
                     EditorSettings.validateVisualEffect(view.states().string("defaultVisualEffect").get()),
@@ -29,7 +30,10 @@ final class SettingsWindow implements AutoCloseable {
                     EditorSettings.parseWhisperNumber(view.states().string("whisperBeamSize").get(),"A busca do Whisper",1,10),
                     EditorSettings.parseWhisperNumber(view.states().string("whisperCpuThreads").get(),"As threads do Whisper",1,16),
                     Boolean.parseBoolean(view.states().string("whisperVad").get()),
-                    EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()));
+                    EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()),
+                        view.states().string("pythonExecutable").get(),view.states().string("ffmpegExecutable").get(),
+                        view.states().string("ffprobeExecutable").get(),view.states().string("whisperScriptsDirectory").get(),
+                        view.states().string("whisperModelsDirectory").get());
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -37,6 +41,7 @@ final class SettingsWindow implements AutoCloseable {
           .register("showGeneral",view -> showSection(view,"General"))
           .register("showVisual",view -> showSection(view,"Visual"))
           .register("showWhisper",view -> showSection(view,"Whisper"))
+          .register("showTools",view -> showSection(view,"Tools"))
           .register("showAvatar",view -> showSection(view,"Avatar"))
           .register("showPrompt",view -> showSection(view,"Prompt"))
           .register("resetPrompt",view -> view.states().set("basePrompt",EditorSettings.defaultPrompt()))
@@ -56,6 +61,11 @@ final class SettingsWindow implements AutoCloseable {
         session=UiDefinition.fromResource(SettingsWindow.class,"/views/settings.view.jsonc").open(actions);
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
         session.states().set("avatarDirectory",avatarDirectory);
+        session.states().set("pythonExecutable",values.pythonExecutable);
+        session.states().set("ffmpegExecutable",values.ffmpegExecutable);
+        session.states().set("ffprobeExecutable",values.ffprobeExecutable);
+        session.states().set("whisperScriptsDirectory",values.whisperScriptsDirectory);
+        session.states().set("whisperModelsDirectory",values.whisperModelsDirectory);
         session.states().set("basePrompt",values.basePrompt);
         session.states().set("pauseCutThreshold",Double.toString(values.pauseCutThreshold));
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
@@ -76,7 +86,7 @@ final class SettingsWindow implements AutoCloseable {
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
     }
     private static void showSection(UiSession view,String selected) {
-        for(String section: new String[]{"General","Visual","Whisper","Avatar","Prompt"}) {
+        for(String section: new String[]{"General","Visual","Whisper","Tools","Avatar","Prompt"}) {
             boolean active=section.equals(selected);
             view.states().set("show"+section,active);
             var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();

@@ -10,9 +10,12 @@ final class SoundLevel {
     private SoundLevel() { }
 
     static double effectVolume(Path file) {
+        return effectVolume(file,"ffmpeg");
+    }
+    static double effectVolume(Path file,String ffmpeg) {
         Process process=null;
         try {
-            process=new ProcessBuilder("ffmpeg","-hide_banner","-nostats","-v","info","-i",file.toString(),
+            process=new ProcessBuilder(ffmpeg,"-hide_banner","-nostats","-v","info","-i",file.toString(),
                     "-t","5","-af","volumedetect","-f","null","-").redirectErrorStream(true).start();
             if(!process.waitFor(15,TimeUnit.SECONDS))return .5;
             String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);

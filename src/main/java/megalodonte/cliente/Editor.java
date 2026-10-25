@@ -24,7 +24,9 @@ public final class Editor extends ViewScript {
                 settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
-                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent),project.avatarDirectory,(values,avatarDirectory) -> {
+                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent,
+                settings.pythonExecutable,settings.ffmpegExecutable,settings.ffprobeExecutable,
+                settings.whisperScriptsDirectory,settings.whisperModelsDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             project.avatarDirectory=avatarDirectory;
             if(!project.clips.isEmpty()) {
@@ -214,7 +216,8 @@ public final class Editor extends ViewScript {
         try {
             Path library=EditorSettings.validateSounds(settings.soundsDirectory);
             var updated=project.snapshot();updated.script=text("roteiro");
-            var additions=SoundApplicator.apply(updated,library,settings.soundEffectPercent);
+            var additions=SoundApplicator.apply(updated,library,settings.soundEffectPercent,
+                    ExternalTools.command(settings.ffmpegExecutable,"ffmpeg"));
             if(additions.addedCount()==0) {
                 String status=project.music.file.isBlank() ? "Não encontrei uma trilha ambiente nem efeitos correspondentes na biblioteca." :
                         "A música existente foi preservada; os efeitos aplicáveis já estão na timeline.";
@@ -261,7 +264,7 @@ public final class Editor extends ViewScript {
         catch (Exception e) { message(e.getMessage()); return; }
         if (Files.exists(target) && !confirm("Substituir o vídeo existente? " + target.getFileName())) return;
         pausePlayback(); project.script=text("roteiro"); var snapshot=project.snapshot(); final Path output=target;
-        exporter=new VideoExporter(); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
+        exporter=new VideoExporter(settings.ffmpegExecutable,settings.ffprobeExecutable); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
         exportThread=Thread.ofPlatform().daemon(true).name("megalodonte-export").start(() -> {
             String result;
             try {

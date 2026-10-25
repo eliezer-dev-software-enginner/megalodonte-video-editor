@@ -114,6 +114,7 @@ def main():
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--pause-cut-threshold', type=float, default=PAUSE_CUT_THRESHOLD,
                         help='Pausa mínima entre cenas para cortar após a fala anterior (segundos).')
+    parser.add_argument('--ffprobe', default='ffprobe', help='Executável FFprobe configurado no editor.')
     args = parser.parse_args()
     manifest = args.project.resolve()
     original = manifest.read_bytes()
@@ -123,7 +124,7 @@ def main():
     transcript = json.loads((folder / 'transcricao.json').read_text())
     if hashlib.sha256(audio.read_bytes()).hexdigest() != transcript['audioSha256']:
         raise SystemExit('O áudio foi alterado após a transcrição. Transcreva novamente.')
-    duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
+    duration = float(subprocess.check_output([args.ffprobe, '-v', 'error', '-show_entries',
                                              'format=duration', '-of', 'csv=p=0', str(audio)], text=True))
     words = [word for segment in transcript['segments'] for word in segment['words']]
     report = align(project['clips'], words, duration, pause_cut_threshold=args.pause_cut_threshold)

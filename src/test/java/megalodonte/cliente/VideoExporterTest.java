@@ -42,6 +42,17 @@ class VideoExporterTest {
         assertTrue(error.getMessage().contains("Sincronize com Whisper"));
         assertEquals("original",Files.readString(output));
     }
+    @Test void configuredFfprobeIsUsedForNarrationCheck() throws Exception {
+        var probe=directory.resolve("custom-ffprobe");
+        Files.writeString(probe,"#!/bin/sh\nprintf '9.0\\n'\n");probe.toFile().setExecutable(true);
+        var project=VideoProject.fromScript("Cena");
+        project.clips.getFirst().image=image("probe.png",Color.BLUE).toString();
+        project.clips.getFirst().duration=1;
+        project.narration.file=wave("short.wav",220,.2,.4).toString();
+        var error=assertThrows(IOException.class,()->new VideoExporter(320,180,"ffmpeg",probe.toString())
+                .export(project,directory.resolve("out.mp4"),m->{}));
+        assertTrue(error.getMessage().contains("9,0") || error.getMessage().contains("9.0"));
+    }
     @Test void exportsFullHdOrderedScenesWithNarrationAndQuietLoopingMusic() throws Exception {
         var project=VideoProject.fromScript("Vermelho\n\nAzul");
         project.clips.get(0).image=image("primeira ' imagem.png",Color.RED).toString();

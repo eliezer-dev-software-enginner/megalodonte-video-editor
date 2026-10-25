@@ -13,6 +13,7 @@ def main():
     parser.add_argument('--beam-size', type=int, default=5)
     parser.add_argument('--cpu-threads', type=int, default=4)
     parser.add_argument('--vad', choices=('true', 'false'), default='true')
+    parser.add_argument('--model-cache', type=Path, default=Path(__file__).resolve().parents[1] / '.local-asr' / 'models')
     args = parser.parse_args()
     if not 1 <= args.beam_size <= 10 or not 1 <= args.cpu_threads <= 16:
         parser.error('beam-size deve ficar entre 1 e 10 e cpu-threads entre 1 e 16')
@@ -27,7 +28,7 @@ def main():
     output = manifest.parent / 'sincronizacao'
     output.mkdir(exist_ok=True)
     from faster_whisper import WhisperModel
-    cache = Path(__file__).resolve().parents[1] / '.local-asr' / 'models'
+    cache = args.model_cache.expanduser().resolve()
     print('Carregando Whisper multilingual ' + args.model + ' localmente…', flush=True)
     model = WhisperModel(args.model, device='cpu', compute_type='int8', cpu_threads=args.cpu_threads,
                          download_root=str(cache))

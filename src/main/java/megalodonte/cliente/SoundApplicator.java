@@ -41,6 +41,9 @@ final class SoundApplicator {
 
     /** Percentage of scenes that may contain sound effects; background music is independent. */
     static Result apply(VideoProject project, Path library,int effectPercent) throws IOException {
+        return apply(project,library,effectPercent,"ffmpeg");
+    }
+    static Result apply(VideoProject project, Path library,int effectPercent,String ffmpeg) throws IOException {
         EditorSettings.validateSoundEffectPercent(effectPercent);
         if (!Files.isDirectory(library) || !Files.isReadable(library))
             throw new IOException("A pasta de sons configurada não existe ou não pode ser lida: " + library);
@@ -103,7 +106,7 @@ final class SoundApplicator {
             effect.start = Math.min(start + .4, start + clip.duration - .1);
             effect.offset = 0;
             effect.duration = Math.min(3, start + clip.duration - effect.start);
-            effect.volume = levels.computeIfAbsent(candidate.sound.file(),SoundLevel::effectVolume);
+            effect.volume = levels.computeIfAbsent(candidate.sound.file(),file->SoundLevel.effectVolume(file,ffmpeg));
             effect.fadeIn = Math.min(.2, effect.duration / 4);
             effect.fadeOut = Math.min(.7, effect.duration / 3);
             effect.validate();

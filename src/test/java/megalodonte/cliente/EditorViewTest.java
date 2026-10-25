@@ -54,13 +54,15 @@ class EditorViewTest {
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
                 assertEquals("1.0",pauseField.getText());
                 assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
-                for(String section:new String[]{"Efeitos visuais","Whisper","Avatar","Prompt base","Geral"}) {
+                for(String section:new String[]{"Efeitos visuais","Whisper","Ferramentas","Avatar","Prompt base","Geral"}) {
                     var navigation=settingsRoot.lookupAll(".button").stream()
                         .filter(n->n instanceof Button b && b.getText().equals(section)).map(n->(Button)n).findFirst().orElseThrow();
                     navigation.fire();
                     assertTrue(navigation.getStyle().contains("#2563eb"));
                 }
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
+                assertTrue(settingsRoot.lookupAll(".text-field").stream().anyMatch(n->n instanceof TextField field &&
+                        "Ex.: /usr/bin/ffmpeg".equals(field.getPromptText())));
                 var effectCoverage=settingsRoot.lookupAll(".combo-box").stream()
                     .filter(n->n instanceof ComboBox<?> box && box.getItems().contains("50% de efeitos sonoros"))
                     .map(n->(ComboBox<String>)n).findFirst().orElseThrow();

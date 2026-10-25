@@ -59,5 +59,27 @@ class EditorSettingsTest {
         assertEquals("small",legacy.whisperModel);assertEquals("pt",legacy.whisperLanguage);
         assertEquals(5,legacy.whisperBeamSize);assertEquals(4,legacy.whisperCpuThreads);assertTrue(legacy.whisperVad);
         assertEquals(100,legacy.soundEffectPercent);
+        assertEquals("",legacy.pythonExecutable);
+        assertEquals("",legacy.ffmpegExecutable);
+        assertEquals("",legacy.ffprobeExecutable);
+    }
+    @Test void localToolsCanBeConfiguredAndSurviveKeyMigration() throws Exception {
+        var python=folder.resolve("python");Files.writeString(python,"#!/bin/sh\n");python.toFile().setExecutable(true);
+        var ffmpeg=folder.resolve("ffmpeg");Files.writeString(ffmpeg,"#!/bin/sh\n");ffmpeg.toFile().setExecutable(true);
+        var ffprobe=folder.resolve("ffprobe");Files.writeString(ffprobe,"#!/bin/sh\n");ffprobe.toFile().setExecutable(true);
+        var scripts=Files.createDirectories(folder.resolve("tools"));
+        Files.writeString(scripts.resolve("transcribe_narration.py"),"");
+        Files.writeString(scripts.resolve("sync_narration.py"),"");
+        var store=new EditorSettings(folder.resolve("settings.json"));
+        var values=new EditorSettings.Values("",folder.toString(),"Prompt",1,"none",1,"small","pt",5,4,true,100,
+                python.toString(),ffmpeg.toString(),ffprobe.toString(),folder.toString(),folder.toString());
+        store.save(values);store.saveApiKey("local-key");var loaded=store.load();
+        assertEquals(python.toString(),loaded.pythonExecutable);
+        assertEquals(ffmpeg.toString(),loaded.ffmpegExecutable);
+        assertEquals(ffprobe.toString(),loaded.ffprobeExecutable);
+        assertEquals(folder.toString(),loaded.whisperScriptsDirectory);
+        assertEquals(folder.toString(),loaded.whisperModelsDirectory);
+        assertThrows(IllegalArgumentException.class,()->ExternalTools.validateExecutable(folder.resolve("missing").toString(),"Python"));
+        assertEquals("",ExternalTools.validateExecutable("","Python"));
     }
 }
