@@ -159,6 +159,8 @@ public final class VideoProject {
             var project = new VideoProject(); project.script = root.get("script").getAsString();
             if (root.has("avatarDirectory") && !root.get("avatarDirectory").isJsonNull())
                 project.avatarDirectory = root.get("avatarDirectory").getAsString();
+            if (!project.avatarDirectory.isBlank() && !Path.of(project.avatarDirectory).isAbsolute())
+                project.avatarDirectory = file.toAbsolutePath().getParent().resolve(project.avatarDirectory).normalize().toString();
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
             if (root.has("visualEffectStrength")) project.visualEffectStrength = root.get("visualEffectStrength").getAsDouble();
             validateVisualEffectStrength(project.visualEffectStrength);
