@@ -10,7 +10,7 @@ javafx { version = "25.0.1"; modules("javafx.controls", "javafx.graphics", "java
 dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("megalodonte:megalodonte-script-app:0.1.0")
-    testImplementation("megalodonte:megalodonte-theme:1.0.0-beta")
+    implementation("megalodonte:megalodonte-theme:1.0.0-beta")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

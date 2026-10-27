@@ -119,6 +119,10 @@
       "type": "string",
       "initial": ""
     },
+    "themeAction": {
+      "type": "string",
+      "initial": "☾ Tema lua"
+    },
     "efeitosTimeline": {
       "type": "string",
       "initial": "[]"
@@ -193,6 +197,16 @@
               {
                 "type": "Button",
                 "props": {
+                  "text": "Novo projeto",
+                  "height": 36
+                },
+                "events": {
+                  "onClick": "newProject"
+                }
+              },
+              {
+                "type": "Button",
+                "props": {
                   "text": "Abrir projeto",
                   "height": 36
                 },
@@ -255,6 +269,13 @@
                 "events": {
                   "onClick": "openSettings"
                 }
+              },
+              {
+                "type": "Button",
+                "id": "themeButton",
+                "props": { "height": 36 },
+                "bind": { "text": "themeAction" },
+                "events": { "onClick": "toggleTheme" }
               }
             ]
           }
@@ -990,7 +1011,7 @@
                 "props": {
                   "spacing": 14,
                   "padding": 16,
-                  "bgColor": "#edf2f8"
+                  "fillWidth": true
                 },
                 "children": [
                   {
@@ -1028,6 +1049,16 @@
                       "required": true,
                       "label": "Roteiro",
                       "maxLength": 100000
+                    }
+                  },
+                  {
+                    "type": "Button",
+                    "props": {
+                      "text": "Copiar sem avatarização",
+                      "height": 36
+                    },
+                    "events": {
+                      "onClick": "copyWithoutAvatarMarkers"
                     }
                   },
                   {

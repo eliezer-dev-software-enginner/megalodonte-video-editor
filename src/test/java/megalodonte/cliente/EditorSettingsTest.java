@@ -8,6 +8,7 @@ class EditorSettingsTest {
     @Test void defaultsPersistPromptAndSoundsAndProtectPriorPreferencesOnError() throws Exception {
         Path file=folder.resolve("preferences/settings.json");var store=new EditorSettings(file);
         var defaults=store.load();assertEquals(EditorSettings.DEFAULT_SOUNDS,defaults.soundsDirectory);
+        assertTrue(defaults.notifyTelegram);
         assertEquals(1.0,defaults.pauseCutThreshold);
         assertTrue(defaults.basePrompt.contains("PRODUTOR DO PROJETO"));assertTrue(defaults.basePrompt.contains("audio.effects"));
         var values=new EditorSettings.Values("dummy-key",folder.toString(),"Meu prompt\nCom instruções e acentos: geração.",1.8,"smooth",1.6,"medium","auto",7,6,false,50);
@@ -17,6 +18,7 @@ class EditorSettingsTest {
         assertEquals("medium",restored.whisperModel);assertEquals("auto",restored.whisperLanguage);
         assertEquals(7,restored.whisperBeamSize);assertEquals(6,restored.whisperCpuThreads);assertFalse(restored.whisperVad);
         assertEquals(50,restored.soundEffectPercent);
+        assertTrue(restored.notifyTelegram);
         assertEquals(folder.toString(),restored.soundsDirectory);assertFalse(values.toString().contains(values.apiKey));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.resolve("missing").toString(),"Prompt")));
         assertThrows(IllegalArgumentException.class,()->store.save(new EditorSettings.Values("",folder.toString()," ")));
@@ -59,9 +61,22 @@ class EditorSettingsTest {
         assertEquals("small",legacy.whisperModel);assertEquals("pt",legacy.whisperLanguage);
         assertEquals(5,legacy.whisperBeamSize);assertEquals(4,legacy.whisperCpuThreads);assertTrue(legacy.whisperVad);
         assertEquals(100,legacy.soundEffectPercent);
+        assertTrue(legacy.notifyTelegram);
         assertEquals("",legacy.pythonExecutable);
         assertEquals("",legacy.ffmpegExecutable);
         assertEquals("",legacy.ffprobeExecutable);
+    }
+    @Test void telegramPreferenceCanBeDisabledAndSurvivesKeyMigration() throws Exception {
+        var store=new EditorSettings(folder.resolve("settings.json"));
+        var defaults=store.load();
+        store.save(new EditorSettings.Values(defaults.apiKey,defaults.soundsDirectory,defaults.basePrompt,
+                defaults.pauseCutThreshold,defaults.defaultVisualEffect,defaults.visualEffectStrength,
+                defaults.whisperModel,defaults.whisperLanguage,defaults.whisperBeamSize,defaults.whisperCpuThreads,
+                defaults.whisperVad,defaults.soundEffectPercent,defaults.pythonExecutable,defaults.ffmpegExecutable,
+                defaults.ffprobeExecutable,defaults.whisperScriptsDirectory,defaults.whisperModelsDirectory,false));
+        assertFalse(store.load().notifyTelegram);
+        store.saveApiKey("dummy-key");
+        assertFalse(store.load().notifyTelegram);
     }
     @Test void localToolsCanBeConfiguredAndSurviveKeyMigration() throws Exception {
         var python=folder.resolve("python");Files.writeString(python,"#!/bin/sh\n");python.toFile().setExecutable(true);

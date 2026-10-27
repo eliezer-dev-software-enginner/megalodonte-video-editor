@@ -19,6 +19,7 @@ final class EditorSettings {
         final int whisperBeamSize, whisperCpuThreads;
         final boolean whisperVad;
         final int soundEffectPercent;
+        final boolean notifyTelegram;
         final String pythonExecutable, ffmpegExecutable, ffprobeExecutable, whisperScriptsDirectory, whisperModelsDirectory;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
@@ -41,13 +42,22 @@ final class EditorSettings {
                int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent) {
             this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
                     whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,
-                    "","","","","");
+                    "","","","","",true);
         }
         Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
                String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
                int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
                String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
                String whisperScriptsDirectory,String whisperModelsDirectory) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
+                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,
+                    pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,true);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
+               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
+               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
+               String whisperScriptsDirectory,String whisperModelsDirectory,boolean notifyTelegram) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
             this.defaultVisualEffect=defaultVisualEffect;
@@ -58,6 +68,7 @@ final class EditorSettings {
             this.pythonExecutable=pythonExecutable;this.ffmpegExecutable=ffmpegExecutable;
             this.ffprobeExecutable=ffprobeExecutable;this.whisperScriptsDirectory=whisperScriptsDirectory;
             this.whisperModelsDirectory=whisperModelsDirectory;
+            this.notifyTelegram=notifyTelegram;
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -90,7 +101,8 @@ final class EditorSettings {
             validateSoundEffectPercent(soundEffectPercent);
             return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent,
                     value(json,"pythonExecutable",""),value(json,"ffmpegExecutable",""),value(json,"ffprobeExecutable",""),
-                    value(json,"whisperScriptsDirectory",""),value(json,"whisperModelsDirectory",""));
+                    value(json,"whisperScriptsDirectory",""),value(json,"whisperModelsDirectory",""),
+                    json.has("notifyTelegram") ? json.get("notifyTelegram").getAsBoolean() : true);
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
@@ -112,7 +124,7 @@ final class EditorSettings {
         write(new Values(values.apiKey,directory,values.basePrompt,values.pauseCutThreshold,
                 values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
                 values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent,
-                python,ffmpeg,ffprobe,scripts,models));
+                python,ffmpeg,ffprobe,scripts,models,values.notifyTelegram));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
@@ -120,7 +132,7 @@ final class EditorSettings {
                 current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
                 current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent,
                 current.pythonExecutable,current.ffmpegExecutable,current.ffprobeExecutable,
-                current.whisperScriptsDirectory,current.whisperModelsDirectory));
+                current.whisperScriptsDirectory,current.whisperModelsDirectory,current.notifyTelegram));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
@@ -133,6 +145,7 @@ final class EditorSettings {
         json.addProperty("whisperBeamSize",values.whisperBeamSize);json.addProperty("whisperCpuThreads",values.whisperCpuThreads);
         json.addProperty("whisperVad",values.whisperVad);
         json.addProperty("soundEffectPercent",values.soundEffectPercent);
+        json.addProperty("notifyTelegram",values.notifyTelegram);
         json.addProperty("pythonExecutable",values.pythonExecutable);
         json.addProperty("ffmpegExecutable",values.ffmpegExecutable);
         json.addProperty("ffprobeExecutable",values.ffprobeExecutable);

@@ -13,6 +13,7 @@ final class SettingsWindow implements AutoCloseable {
     @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,String avatarDirectory) throws IOException; }
     private final Stage stage=new Stage();
     private final UiSession session;
+    private final javafx.scene.control.CheckBox notifyTelegram=new javafx.scene.control.CheckBox("Notificar no Telegram");
     SettingsWindow(Window owner,EditorSettings.Values values,String avatarDirectory,Apply apply) {
         stage.setTitle("Configurações · Megalodonte Video Editor");
         if(owner!=null) { stage.initOwner(owner); stage.initModality(Modality.WINDOW_MODAL); }
@@ -33,7 +34,7 @@ final class SettingsWindow implements AutoCloseable {
                     EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()),
                         view.states().string("pythonExecutable").get(),view.states().string("ffmpegExecutable").get(),
                         view.states().string("ffprobeExecutable").get(),view.states().string("whisperScriptsDirectory").get(),
-                        view.states().string("whisperModelsDirectory").get());
+                        view.states().string("whisperModelsDirectory").get(),notifyTelegram.isSelected());
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -59,6 +60,7 @@ final class SettingsWindow implements AutoCloseable {
               if(selected!=null) view.states().set("avatarDirectory",selected.toPath().toAbsolutePath().normalize().toString());
           });
         session=UiDefinition.fromResource(SettingsWindow.class,"/views/settings.view.jsonc").open(actions);
+        notifyTelegram.setSelected(values.notifyTelegram);
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
         session.states().set("avatarDirectory",avatarDirectory);
         session.states().set("pythonExecutable",values.pythonExecutable);
@@ -80,7 +82,10 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("whisperVad",Boolean.toString(values.whisperVad));
         session.states().set("soundEffectPercentOptions","[\"0% de efeitos sonoros\",\"25% de efeitos sonoros\",\"50% de efeitos sonoros\",\"75% de efeitos sonoros\",\"100% de efeitos sonoros\"]");
         session.states().set("soundEffectPercent",values.soundEffectPercent+"% de efeitos sonoros");
-        stage.setScene(new Scene((Parent)session.render().getJavaFxNode(),940,680));
+        var root=(Parent)session.render().getJavaFxNode();
+        ((javafx.scene.layout.Pane)session.component("settingsGeneralPanel").getJavaFxNode()).getChildren().add(notifyTelegram);
+        stage.setScene(new Scene(root,940,680));
+        EditorTheme.style(stage.getScene());
         stage.setMinWidth(820);stage.setMinHeight(520);
         showSection(session,"General");
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
@@ -91,9 +96,11 @@ final class SettingsWindow implements AutoCloseable {
             view.states().set("show"+section,active);
             var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();
             button.setPrefWidth(176);
+            var colors=megalodonte.base.theme.ThemeManager.theme().colors();
             button.setStyle(active
-                    ? "-fx-background-color: #2563eb; -fx-text-fill: white; -fx-font-weight: bold;"
-                    : "-fx-background-color: transparent;");
+                    ? "-fx-background-color: "+colors.primary()+"; -fx-text-fill: "+
+                      (EditorTheme.isDark() ? "#101a2b" : "white")+"; -fx-font-weight: bold;"
+                    : "-fx-background-color: transparent; -fx-text-fill: "+colors.textPrimary()+";");
         }
     }
     static String validateAvatarDirectory(String value) {

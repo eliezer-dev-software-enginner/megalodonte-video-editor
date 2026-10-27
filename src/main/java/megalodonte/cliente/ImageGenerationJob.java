@@ -25,7 +25,8 @@ final class ImageGenerationJob {
         var pending=pending(project);Files.createDirectories(assets);
         for(int index:pending) {
             check();progress.accept("Gerando imagem da cena "+(index+1)+" de "+project.clips.size()+"…");
-            String context=project.script.length()>4000 ? project.script.substring(0,4000) : project.script;
+            String plainScript=VideoProject.withoutAvatarMarkers(project.script);
+            String context=plainScript.length()>4000 ? plainScript.substring(0,4000) : plainScript;
             String prompt="Crie uma imagem para um vídeo horizontal 16:9. Composição cinematográfica, sem legendas, letras, logotipos ou marcas d'água. "
                 +"Mantenha coerência visual com o roteiro. Contexto do roteiro: "+context+"\nCena "+(index+1)+": "+project.clips.get(index).text;
             byte[] png=client.generate(prompt);check();

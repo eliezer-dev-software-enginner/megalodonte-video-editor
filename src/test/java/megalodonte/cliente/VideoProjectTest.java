@@ -5,6 +5,12 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class VideoProjectTest {
     @TempDir Path directory;
+    @Test void copyScriptWithoutAvatarMarkersKeepsSceneTextAndParagraphs() {
+        String script="#falando_boca-aberta.png\nPrimeira fala.\n\n#pensativo_boca-aberta.png\nSegunda fala.\nLinha seguinte.";
+        assertEquals("Primeira fala.\n\nSegunda fala.\nLinha seguinte.",VideoProject.withoutAvatarMarkers(script));
+        assertEquals("Uma linha #falando.png no meio continua.",
+                VideoProject.withoutAvatarMarkers("Uma linha #falando.png no meio continua."));
+    }
     @Test void avatarMarkersAreExcludedFromNarrationAndResolveInSubfolders() throws Exception {
         var folder=Files.createDirectories(directory.resolve("avatares/falando"));
         Files.write(folder.resolve("falando_boca-aberta.png"),new byte[]{1});
@@ -19,6 +25,20 @@ class VideoProjectTest {
         assertEquals(project.clips.getFirst().avatar,restored.snapshot().clips.getFirst().avatar);
         assertEquals("Olá.",restored.clips.getFirst().text);
         assertThrows(IllegalArgumentException.class,()->VideoProject.fromScript("#inexistente.jpg\nCena"));
+    }
+    @Test void removedAvatarMarkersUpdateExistingScenesWithoutRecreatingThem() {
+        String original="#falando_boca-aberta.png\nPrimeira cena.\n\n#pensativo_boca-aberta.png\nSegunda cena.";
+        var project=VideoProject.fromScript(original);
+        project.clips.getFirst().duration=12;
+        project.clips.getFirst().image="imagem-existente.png";
+        String edited="#falando_boca-aberta.png\nPrimeira cena.\n\nSegunda cena.";
+        assertEquals(1,project.syncAvatarsFromScript(edited,true));
+        assertEquals("falando_boca-aberta.png",project.clips.getFirst().avatar);
+        assertEquals("",project.clips.get(1).avatar);
+        assertEquals(12,project.clips.getFirst().duration);
+        assertEquals("imagem-existente.png",project.clips.getFirst().image);
+        assertEquals(-1,project.syncAvatarsFromScript("Outra fala.\n\nSegunda cena.",true));
+        assertEquals("falando_boca-aberta.png",project.clips.getFirst().avatar);
     }
     @Test void avatarFolderBelongsToProjectAndSurvivesSave() throws Exception {
         var avatarFolder=Files.createDirectory(directory.resolve("meu-avatar"));

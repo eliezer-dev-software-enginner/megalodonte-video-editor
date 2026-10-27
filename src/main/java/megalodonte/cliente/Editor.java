@@ -8,6 +8,22 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.function.Consumer;
 public final class Editor extends ViewScript {
+    public void copyWithoutAvatarMarkers() {
+        String script=VideoProject.withoutAvatarMarkers(text("roteiro"));
+        if(script.isBlank()) { message("Escreva um roteiro antes de copiar."); return; }
+        var content=new javafx.scene.input.ClipboardContent();
+        content.putString(script);
+        if(javafx.scene.input.Clipboard.getSystemClipboard().setContent(content))
+            message("Roteiro sem marcações de avatar copiado.");
+        else message("Não foi possível copiar o roteiro.");
+    }
+    public void toggleTheme() {
+        try {
+            EditorTheme.select(!EditorTheme.isDark());
+            set("themeAction",EditorTheme.isDark() ? "☀ Tema sol" : "☾ Tema lua");
+            EditorTheme.style(component("themeButton").getJavaFxNode().getScene());
+        } catch(java.io.IOException e) { message("Não foi possível salvar o tema: "+e.getMessage()); }
+    }
     private VideoProject project = new VideoProject();
     private Path projectFile;
     private String projectRevision;
@@ -26,7 +42,7 @@ public final class Editor extends ViewScript {
                 settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
                 settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent,
                 settings.pythonExecutable,settings.ffmpegExecutable,settings.ffprobeExecutable,
-                settings.whisperScriptsDirectory,settings.whisperModelsDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
+                settings.whisperScriptsDirectory,settings.whisperModelsDirectory,settings.notifyTelegram),project.avatarDirectory,(values,avatarDirectory) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             project.avatarDirectory=avatarDirectory;
             if(!project.clips.isEmpty()) {
@@ -50,6 +66,8 @@ public final class Editor extends ViewScript {
     private WhisperSync whisperSync;
     private Thread whisperThread;
     private Consumer<String> motionEffectListener;
+    private Consumer<String> scriptListener;
+    private boolean scriptAvatarsManaged;
     private String lastMotionEffect="none";
     private boolean syncingMotionEffect;
     private boolean motionEffectApplying;
@@ -147,6 +165,7 @@ public final class Editor extends ViewScript {
         disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt();
         if(whisperSync!=null) whisperSync.cancel();if(whisperThread!=null) whisperThread.interrupt();if (playback != null) playback.stop(); playing = false;
         if(motionEffectListener!=null) state("motionEffect",String.class).unsubscribe(motionEffectListener);
+        if(scriptListener!=null) state("roteiro",String.class).unsubscribe(scriptListener);
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
     }
     private void audioError(String error) { if (!disposed) message(error); }
@@ -265,8 +284,9 @@ public final class Editor extends ViewScript {
         if (Files.exists(target) && !confirm("Substituir o vídeo existente? " + target.getFileName())) return;
         pausePlayback(); project.script=text("roteiro"); var snapshot=project.snapshot(); final Path output=target;
         exporter=new VideoExporter(settings.ffmpegExecutable,settings.ffprobeExecutable); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
+        final boolean notifyOnCompletion=settings.notifyTelegram;
         exportThread=Thread.ofPlatform().daemon(true).name("megalodonte-export").start(() -> {
-            String result;
+            String result; boolean cancelled=false;
             try {
                 job.export(snapshot,output,progress -> javafx.application.Platform.runLater(() -> { if (!disposed) set("exportStatus",progress); }));
                 try {
@@ -279,8 +299,12 @@ public final class Editor extends ViewScript {
                     result="Vídeo exportado: "+output+". Não foi possível abrir a pasta automaticamente: "+openError.getMessage();
                 }
             }
-            catch(java.util.concurrent.CancellationException e) { result="Exportação cancelada."; }
+            catch(java.util.concurrent.CancellationException e) { result="Exportação cancelada.";cancelled=true; }
             catch(Exception e) { result="Não foi possível exportar: "+e.getMessage(); }
+            if(notifyOnCompletion && !cancelled) {
+                try { TelegramExportNotifier.send(result); }
+                catch(Exception e) { result += " Não foi possível notificar no Telegram: "+e.getClass().getSimpleName()+"."; }
+            }
             final String outcome=result;
             javafx.application.Platform.runLater(() -> { if (!disposed) { exporter=null; exportThread=null; set("exportando",false); set("exportStatus",outcome); message(outcome); } });
         });
@@ -339,6 +363,8 @@ public final class Editor extends ViewScript {
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
     @Override public void onMount() {
+        set("themeAction",EditorTheme.isDark() ? "☀ Tema sol" : "☾ Tema lua");
+        javafx.application.Platform.runLater(() -> EditorTheme.style(component("themeButton").getJavaFxNode().getScene()));
         set("motionEffectOptions",new com.google.gson.Gson().toJson(List.of(
             Map.of("value","none","label","Nenhum"),Map.of("value","smooth","label","Movimento suave"),
             Map.of("value","particles","label","Partículas"),Map.of("value","shake","label","Tremor leve"),
@@ -363,6 +389,13 @@ public final class Editor extends ViewScript {
             }
         };
         state("motionEffect",String.class).subscribe(motionEffectListener);
+        scriptListener=value -> {
+            int changed=project.syncAvatarsFromScript(value,scriptAvatarsManaged);
+            if(changed<0)return;
+            scriptAvatarsManaged=VideoProject.hasAvatarMarkers(value);
+            if(changed>0)refreshVisualPreview();
+        };
+        state("roteiro",String.class).subscribe(scriptListener);
     }
     @Override public void onSubmit() { if(generationBusy()) return;
         if (!project.clips.isEmpty() && !confirm("Recriar cenas? As imagens e os ajustes atuais serão substituídos.")) return;
@@ -370,6 +403,7 @@ public final class Editor extends ViewScript {
         try { parsed=VideoProject.fromScript(text("roteiro")); }
         catch(IllegalArgumentException e) { message(e.getMessage()); return; }
         timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = parsed; project.animateImages=previous.animateImages;
+        scriptAvatarsManaged=VideoProject.hasAvatarMarkers(text("roteiro"));
         project.avatarDirectory=previous.avatarDirectory;
         project.visualEffectStrength=previous.visualEffectStrength;
         if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
@@ -475,6 +509,37 @@ public final class Editor extends ViewScript {
             timelineChanged(); clip.image=file.toString(); refresh(); message("Imagem substituída.");
         } catch(RuntimeException e) { message("Não foi possível trocar a imagem: " + e.getMessage()); }
     }
+    public void newProject() {
+        if(generationBusy()) return;
+        if(exporter!=null) { message("Aguarde ou cancele a exportação antes de criar outro projeto."); return; }
+        if(hasUnsavedChanges() && !confirm("Criar outro projeto e descartar alterações não salvas?")) return;
+        var nameDialog=new TextInputDialog();
+        nameDialog.setTitle("Novo projeto");nameDialog.setHeaderText("Nome do novo projeto");
+        nameDialog.setContentText("Nome da pasta:");
+        if(owner()!=null) nameDialog.initOwner(owner());
+        var answer=nameDialog.showAndWait();
+        if(answer.isEmpty()) return;
+        String name=answer.get().strip();
+        if(!name.matches("[\\p{L}\\p{N}][\\p{L}\\p{N}_-]{0,63}")) {
+            message("Use um nome de até 64 caracteres, com letras, números, hífen ou sublinhado.");return;
+        }
+        var chooser=new javafx.stage.DirectoryChooser();chooser.setTitle("Onde criar a pasta do projeto?");
+        Path initial=FileDialogs.existingFolder(projectFile==null ? null : projectFile.getParent());
+        if(initial!=null) chooser.setInitialDirectory(initial.toFile());
+        var parent=chooser.showDialog(owner());
+        if(parent==null) return;
+        Path folder=parent.toPath().resolve(name),target=folder.resolve(name+".mvideo.json");
+        try {
+            Files.createDirectory(folder);
+            var blank=new VideoProject();blank.visualEffectStrength=settings.visualEffectStrength;
+            blank.save(target);
+            applyProject(blank,target);
+            try { lastProject.remember(target);message("Projeto criado: "+target); }
+            catch(java.io.IOException e) { message("Projeto criado: "+target+". Não foi possível guardar o caminho para a próxima abertura: "+e.getMessage()); }
+        } catch(java.nio.file.FileAlreadyExistsException e) {
+            message("Já existe uma pasta com esse nome: "+folder);
+        } catch(Exception e) { message("Não foi possível criar o projeto: "+e.getMessage()); }
+    }
     public void saveProject() { if(generationBusy()) return;
         if(!readVolumes()) return;
         Path target=projectFile;
@@ -500,6 +565,7 @@ public final class Editor extends ViewScript {
         try { lastProject.clear(); }
         catch(java.io.IOException e) { message("Não foi possível fechar o projeto: " + e.getMessage()); return; }
         timelineChanged(); audio.close(); project=new VideoProject();project.visualEffectStrength=settings.visualEffectStrength;
+        scriptAvatarsManaged=false;
         projectFile=null;projectRevision=null;savedProject=null;
         set("roteiro","");set("efeitoSelecionado",-1);set("selecionada",-1);
         refreshAudio();refresh();message("Projeto fechado. O editor está vazio.");
@@ -529,6 +595,8 @@ public final class Editor extends ViewScript {
         }
         if(VideoProject.removeLegacyApiKey(absolute,revision)) revision=VideoProject.revision(absolute);
         timelineChanged(); project=loaded; projectFile=absolute;projectRevision=revision;savedProject=loaded.snapshot();
+        scriptAvatarsManaged=VideoProject.hasAvatarMarkers(loaded.script);
+        loaded.syncAvatarsFromScript(loaded.script,scriptAvatarsManaged);
         refreshAudio(); audio.load(project,this::audioError); set("roteiro",project.script); set("openaiKey",settings.apiKey);
         set("efeitoSelecionado",project.effects.isEmpty() ? -1 : 0);set("selecionada",project.clips.isEmpty() ? -1 : 0); refresh();
     }

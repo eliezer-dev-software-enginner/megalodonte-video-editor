@@ -81,6 +81,15 @@ public final class VideoProject {
     /** Shared intensity for visual effects; stored with the project so exports are reproducible. */
     public double visualEffectStrength = 1.0;
     public final List<Clip> clips = new ArrayList<>();
+    /** Remove only standalone avatar PNG markers, keeping the spoken paragraphs intact. */
+    public static String withoutAvatarMarkers(String script) {
+        if (script == null || script.isBlank()) return "";
+        return script.replaceAll("(?m)^[ \\t]*#[\\p{L}\\p{N}_-]+\\.png[ \\t]*(?:\\R|$)", "").strip();
+    }
+    public static boolean hasAvatarMarkers(String script) {
+        return script != null && java.util.regex.Pattern.compile("(?m)^[ \\t]*#[\\p{L}\\p{N}_-]+\\.png[ \\t]*$")
+                .matcher(script).find();
+    }
     public static VideoProject fromScript(String script) {
         var project = new VideoProject(); project.script = script;
         for (String paragraph : script.strip().split("\\R\\s*\\R")) if (!paragraph.isBlank()) {
@@ -95,6 +104,23 @@ public final class VideoProject {
             } else project.clips.add(new Clip(scene));
         }
         return project;
+    }
+    /** Reconcile avatar markers without rebuilding clips or touching media and timing; -1 means unsafe to sync. */
+    public int syncAvatarsFromScript(String script, boolean previouslyMarked) {
+        VideoProject parsed;
+        try { parsed = fromScript(script); }
+        catch (IllegalArgumentException error) { return -1; }
+        if (parsed.clips.size() != clips.size()) return -1;
+        boolean marked = parsed.clips.stream().anyMatch(clip -> !clip.avatar.isBlank());
+        if (!marked && !previouslyMarked) return 0; // Preserve avatars selected manually in unmarked scripts.
+        for (int i = 0; i < clips.size(); i++)
+            if (!parsed.clips.get(i).text.equals(clips.get(i).text)) return -1;
+        int changed = 0;
+        for (int i = 0; i < clips.size(); i++) {
+            String avatar = parsed.clips.get(i).avatar;
+            if (!avatar.equals(clips.get(i).avatar)) { clips.get(i).avatar = avatar; changed++; }
+        }
+        return changed;
     }
     public double duration() { return clips.stream().mapToDouble(clip -> clip.duration).sum(); }
     public String timeline() {
