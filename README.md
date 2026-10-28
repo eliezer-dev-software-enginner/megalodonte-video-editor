@@ -85,7 +85,7 @@ Detalhes e decisões: [arquitetura](docs/arquitetura.md).
 1. Cole um roteiro curto, separando as cenas por uma linha em branco, e clique em **Criar cenas do roteiro**.
 2. Salve o projeto para definir onde os assets serão gravados.
 3. Abra **Configurações** e informe a chave no campo oculto **OpenAI API key**, ou inicie o editor com `OPENAI_API_KEY` configurada.
-4. Clique em **Gerar e anexar imagens**. O editor processa todas as cenas sem imagem em sequência; cada PNG recebido é anexado à cena correspondente e o manifesto é atualizado logo após cada resultado.
+4. Clique em **Gerar e anexar imagens**. O editor processa todas as cenas sem imagem em sequência; cada PNG recebido é anexado à cena correspondente e o manifesto é atualizado logo após cada resultado. Com **Notificar no Telegram** ativado em **Configurações → Geral**, o editor avisa ao concluir ou falhar, identificando o projeto. O cancelamento não envia notificação.
 
 O botão gera somente cenas sem imagem, então pode ser usado novamente após uma falha ou cancelamento sem repetir cenas já concluídas. Cada imagem é uma chamada separada à API e pode gerar cobrança. O roteiro é separado localmente; o texto de cada cena e um trecho de contexto são enviados ao endpoint de imagens. Os padrões são `gpt-image-2`, `1536x864` (16:9), qualidade `low` e PNG. São configuráveis via `OPENAI_IMAGE_MODEL`, `OPENAI_IMAGE_SIZE` e `OPENAI_IMAGE_QUALITY`; as combinações precisam ser suportadas pelo modelo escolhido. Contrato verificado na [API oficial de geração de imagens](https://developers.openai.com/api/reference/resources/images/methods/generate).
 

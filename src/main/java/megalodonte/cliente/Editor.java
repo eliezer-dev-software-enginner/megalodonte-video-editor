@@ -82,8 +82,10 @@ public final class Editor extends ViewScript {
         var snapshot=project.snapshot(); var targetProject=project;
         var job=new ImageGenerationJob(client); imageJob=job;set("gerandoImagens",true);set("iaStatus","Preparando imagens…");
         Path assets=projectFile.getParent().resolve(projectFile.getFileName()+".assets").resolve("generated");
+        final boolean notifyOnCompletion=settings.notifyTelegram;
+        final Path generationProjectFile=projectFile;
         imageThread=Thread.ofPlatform().daemon(true).name("openai-images").start(()-> {
-            String outcome;
+            String outcome; boolean cancelled=false;
             try {
                 job.run(snapshot,assets,(index,file)-> {
                     var applied=new java.util.concurrent.CompletableFuture<Void>();
@@ -98,8 +100,12 @@ public final class Editor extends ViewScript {
                     catch(java.util.concurrent.ExecutionException e) { throw new IllegalStateException("Imagem anexada, mas não foi possível atualizar o manifesto.",e.getCause()); }
                 },progress->javafx.application.Platform.runLater(()-> { if(!disposed && imageJob==job) set("iaStatus",progress); }));
                 outcome="Imagens geradas e anexadas às cenas em ordem.";
-            } catch(java.util.concurrent.CancellationException | InterruptedException e) { outcome="Geração cancelada. Imagens já anexadas foram mantidas."; }
+            } catch(java.util.concurrent.CancellationException | InterruptedException e) { outcome="Geração cancelada. Imagens já anexadas foram mantidas.";cancelled=true; }
             catch(Exception e) { outcome="A geração parou: "+e.getMessage()+". As imagens já anexadas foram mantidas."; }
+            if(notifyOnCompletion && !cancelled && !job.cancelled()) {
+                try { TelegramExportNotifier.send("Geração de imagens — "+generationProjectFile.getFileName()+": "+outcome); }
+                catch(Exception e) { outcome += " Não foi possível notificar no Telegram: "+e.getClass().getSimpleName()+"."; }
+            }
             final String result=outcome;
             javafx.application.Platform.runLater(()-> {
                 if(!disposed && imageJob==job) { imageJob=null;imageThread=null;set("gerandoImagens",false);set("iaStatus",result);message(result); }

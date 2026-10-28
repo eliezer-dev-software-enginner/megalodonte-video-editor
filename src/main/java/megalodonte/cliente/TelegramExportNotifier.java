@@ -13,7 +13,7 @@ import java.time.Duration;
 import java.util.Properties;
 import megalodonte.config.RuntimeEnvironment;
 
-/** Sends export results using the user's private local bot configuration. */
+/** Sends editor job results using the user's private local bot configuration. */
 final class TelegramExportNotifier {
     private static final String DEFAULT_CHAT_ID="-1003950566907";
     private TelegramExportNotifier() { }
