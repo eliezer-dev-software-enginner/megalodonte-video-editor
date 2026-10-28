@@ -23,6 +23,7 @@ final class WhisperSync {
     private final int beamSize, cpuThreads;
     private final boolean vad;
     private volatile Process activeProcess;
+    private volatile boolean cancelled;
 
     WhisperSync(Path project,EditorSettings.Values settings) throws IOException {
         this.project = project.toAbsolutePath().normalize();
@@ -41,11 +42,13 @@ final class WhisperSync {
     }
 
     void run(Consumer<String> progress) throws IOException, InterruptedException {
+        progress.accept("Iniciando transcrição local com Whisper…");
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/transcribe_narration.py").toString(), project.toString(),
                         "--model",model,"--language",language,"--beam-size",Integer.toString(beamSize),
                         "--cpu-threads",Integer.toString(cpuThreads),"--vad",Boolean.toString(vad),
                         "--model-cache",modelsDirectory.isBlank() ? scriptsRoot.resolve(".local-asr/models").toString() : modelsDirectory),
                 progress, "Whisper falhou ao transcrever o áudio.");
+        progress.accept("Alinhando a transcrição às cenas…");
         execute(List.of(python.toString(), scriptsRoot.resolve("tools/sync_narration.py").toString(), project.toString(),
                         "--pause-cut-threshold",Double.toString(pauseCutThreshold),"--ffprobe",ffprobe,"--apply"),
                 progress, "Não foi possível alinhar a narração ao roteiro.");
@@ -73,9 +76,12 @@ final class WhisperSync {
     }
 
     void cancel() {
+        cancelled=true;
         Process process = activeProcess;
         if (process != null) process.destroyForcibly();
     }
+
+    boolean cancelled() { return cancelled; }
 
     private static Path findScriptsRoot() throws IOException {
         var candidates = new LinkedHashSet<Path>();

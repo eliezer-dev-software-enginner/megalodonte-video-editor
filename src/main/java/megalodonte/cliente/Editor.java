@@ -8,6 +8,18 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.function.Consumer;
 public final class Editor extends ViewScript {
+    private static void logJob(String operation,String detail) {
+        System.out.println(java.time.OffsetDateTime.now()+" [megalodonte-video-editor] "+operation+": "+detail);
+    }
+    private static String notifyJob(String operation,String result,String telegramMessage,boolean enabled) {
+        if(!enabled) return result;
+        try { TelegramExportNotifier.send(telegramMessage); logJob(operation,"Notificação enviada ao Telegram."); }
+        catch(Exception e) {
+            logJob(operation,"Falha ao notificar no Telegram: "+e.getClass().getSimpleName()+".");
+            return result+" Não foi possível notificar no Telegram: "+e.getClass().getSimpleName()+".";
+        }
+        return result;
+    }
     public void copyWithoutAvatarMarkers() {
         String script=VideoProject.withoutAvatarMarkers(text("roteiro"));
         if(script.isBlank()) { message("Escreva um roteiro antes de copiar."); return; }
@@ -84,6 +96,7 @@ public final class Editor extends ViewScript {
         Path assets=projectFile.getParent().resolve(projectFile.getFileName()+".assets").resolve("generated");
         final boolean notifyOnCompletion=settings.notifyTelegram;
         final Path generationProjectFile=projectFile;
+        logJob("Imagens","Iniciando geração para "+generationProjectFile.getFileName()+".");
         imageThread=Thread.ofPlatform().daemon(true).name("openai-images").start(()-> {
             String outcome; boolean cancelled=false;
             try {
@@ -98,21 +111,20 @@ public final class Editor extends ViewScript {
                     try { applied.get(); }
                     catch(InterruptedException e) { Thread.currentThread().interrupt();throw new java.util.concurrent.CancellationException(); }
                     catch(java.util.concurrent.ExecutionException e) { throw new IllegalStateException("Imagem anexada, mas não foi possível atualizar o manifesto.",e.getCause()); }
-                },progress->javafx.application.Platform.runLater(()-> { if(!disposed && imageJob==job) set("iaStatus",progress); }));
+                },progress-> { logJob("Imagens",progress); javafx.application.Platform.runLater(()-> { if(!disposed && imageJob==job) set("iaStatus",progress); }); });
                 outcome="Imagens geradas e anexadas às cenas em ordem.";
             } catch(java.util.concurrent.CancellationException | InterruptedException e) { outcome="Geração cancelada. Imagens já anexadas foram mantidas.";cancelled=true; }
             catch(Exception e) { outcome="A geração parou: "+e.getMessage()+". As imagens já anexadas foram mantidas."; }
-            if(notifyOnCompletion && !cancelled && !job.cancelled()) {
-                try { TelegramExportNotifier.send("Geração de imagens — "+generationProjectFile.getFileName()+": "+outcome); }
-                catch(Exception e) { outcome += " Não foi possível notificar no Telegram: "+e.getClass().getSimpleName()+"."; }
-            }
+            logJob("Imagens",outcome);
+            if(!cancelled && !job.cancelled()) outcome=notifyJob("Imagens",outcome,
+                    "Geração de imagens — "+generationProjectFile.getFileName()+": "+outcome,notifyOnCompletion);
             final String result=outcome;
             javafx.application.Platform.runLater(()-> {
                 if(!disposed && imageJob==job) { imageJob=null;imageThread=null;set("gerandoImagens",false);set("iaStatus",result);message(result); }
             });
         });
     }
-    public void cancelImages() { if(imageJob!=null) { imageJob.cancel();if(imageThread!=null) imageThread.interrupt();set("iaStatus","Cancelando geração…"); } }
+    public void cancelImages() { if(imageJob!=null) { logJob("Imagens","Cancelamento solicitado.");imageJob.cancel();if(imageThread!=null) imageThread.interrupt();set("iaStatus","Cancelando geração…"); } }
     private boolean generationBusy() {
         if(motionEffectApplying) { message("Aguarde a aplicação do efeito visual terminar antes de alterar o projeto.");return true; }
         if(whisperThread!=null) { message("Aguarde a sincronização com o Whisper terminar antes de alterar o projeto."); return true; }
@@ -133,13 +145,15 @@ public final class Editor extends ViewScript {
             whisperSync=new WhisperSync(projectFile,settings);
         } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage()); return; }
         var sync=whisperSync;var targetProject=project;var targetFile=projectFile;
+        final boolean notifyOnCompletion=settings.notifyTelegram;
+        logJob("Whisper","Iniciando sincronização de "+targetFile.getFileName()+".");
         whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()-> {
-            String outcome; boolean success=false;
+            String outcome; boolean success=false;boolean cancelled=false;
             try {
                 javafx.application.Platform.runLater(()->set("whisperStatus","Carregando Whisper local…"));
-                sync.run(line->javafx.application.Platform.runLater(()-> {
+                sync.run(line-> { logJob("Whisper",line); javafx.application.Platform.runLater(()-> {
                     if(!disposed && whisperSync==sync) set("whisperStatus",line);
-                }));
+                }); });
                 var report=new com.google.gson.JsonParser().parseString(Files.readString(targetFile.getParent().resolve("sincronizacao/alinhamento.json"))).getAsJsonObject();
                 long partial=report.getAsJsonArray("scenes").asList().stream().filter(scene->scene.getAsJsonObject().get("partial").getAsBoolean()).count();
                 double leading=report.get("leadingSilence").getAsDouble();
@@ -150,8 +164,11 @@ public final class Editor extends ViewScript {
                         ((leading>=1 || trailing>=1) ? " Atenção: a narração contém "+
                                 String.format(Locale.forLanguageTag("pt-BR"),"%.1fs antes da primeira fala e %.1fs após a última",leading,trailing)+
                                 "; corte esses silêncios e sincronize novamente se não forem intencionais." : "");
-            } catch(InterruptedException e) { Thread.currentThread().interrupt();outcome="Sincronização cancelada. Nenhuma duração foi aplicada."; }
-            catch(Exception e) { outcome="Não foi possível sincronizar: "+e.getMessage(); }
+            } catch(InterruptedException e) { Thread.currentThread().interrupt();outcome="Sincronização cancelada. Nenhuma duração foi aplicada.";cancelled=true; }
+            catch(Exception e) { cancelled=sync.cancelled();outcome=cancelled ? "Sincronização cancelada. Nenhuma duração foi aplicada." : "Não foi possível sincronizar: "+e.getMessage(); }
+            logJob("Whisper",outcome);
+            if(!cancelled && !sync.cancelled()) outcome=notifyJob("Whisper",outcome,
+                    "Sincronização com Whisper — "+targetFile.getFileName()+": "+outcome,notifyOnCompletion);
             final String result=outcome;final boolean applied=success;
             javafx.application.Platform.runLater(()-> {
                 if(disposed || whisperSync!=sync)return;
@@ -291,10 +308,11 @@ public final class Editor extends ViewScript {
         pausePlayback(); project.script=text("roteiro"); var snapshot=project.snapshot(); final Path output=target;
         exporter=new VideoExporter(settings.ffmpegExecutable,settings.ffprobeExecutable); var job=exporter; set("exportando",true); set("exportStatus","Preparando exportação…");
         final boolean notifyOnCompletion=settings.notifyTelegram;
+        logJob("Exportação","Iniciando vídeo em "+output.getFileName()+".");
         exportThread=Thread.ofPlatform().daemon(true).name("megalodonte-export").start(() -> {
             String result; boolean cancelled=false;
             try {
-                job.export(snapshot,output,progress -> javafx.application.Platform.runLater(() -> { if (!disposed) set("exportStatus",progress); }));
+                job.export(snapshot,output,progress -> { logJob("Exportação",progress); javafx.application.Platform.runLater(() -> { if (!disposed) set("exportStatus",progress); }); });
                 try {
                     Path folder=output.toAbsolutePath().normalize().getParent();
                     if(folder==null || !Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN))
@@ -307,15 +325,13 @@ public final class Editor extends ViewScript {
             }
             catch(java.util.concurrent.CancellationException e) { result="Exportação cancelada.";cancelled=true; }
             catch(Exception e) { result="Não foi possível exportar: "+e.getMessage(); }
-            if(notifyOnCompletion && !cancelled) {
-                try { TelegramExportNotifier.send(result); }
-                catch(Exception e) { result += " Não foi possível notificar no Telegram: "+e.getClass().getSimpleName()+"."; }
-            }
+            logJob("Exportação",result);
+            if(!cancelled) result=notifyJob("Exportação",result,result,notifyOnCompletion);
             final String outcome=result;
             javafx.application.Platform.runLater(() -> { if (!disposed) { exporter=null; exportThread=null; set("exportando",false); set("exportStatus",outcome); message(outcome); } });
         });
     }
-    public void cancelExport() { if (exporter != null) { exporter.cancel(); if (exportThread != null) exportThread.interrupt(); set("exportStatus","Cancelando exportação…"); } }
+    public void cancelExport() { if (exporter != null) { logJob("Exportação","Cancelamento solicitado.");exporter.cancel(); if (exportThread != null) exportThread.interrupt(); set("exportStatus","Cancelando exportação…"); } }
 
     private javafx.animation.AnimationTimer playback;
     private boolean playing;
