@@ -56,10 +56,19 @@ public final class VideoCli {
             boolean applySounds=sounds.equalsIgnoreCase("s") || sounds.equalsIgnoreCase("sim") || sounds.equalsIgnoreCase("yes");
             if(!applySounds && !sounds.equalsIgnoreCase("n") && !sounds.equalsIgnoreCase("não") && !sounds.equalsIgnoreCase("nao") && !sounds.equalsIgnoreCase("no"))
                 throw new IllegalArgumentException("Responda s ou n para aplicar sons.");
-            if(applySounds && settings.soundsDirectory.isBlank()) throw new IllegalArgumentException("Configure a biblioteca de sons em Configurações → Geral no editor.");
+            Path soundsDirectory=null;
+            int soundEffectPercent=25;
+            if(applySounds) {
+                String chosenDirectory=value("--sounds-dir","Pasta de origem dos sons (com arquivos .txt de descrição)",settings.soundsDirectory);
+                if(chosenDirectory.isBlank()) throw new IllegalArgumentException("Informe a pasta de origem dos sons.");
+                soundsDirectory=validateSoundsDirectory(directory(chosenDirectory,"sons"));
+                soundEffectPercent=EditorSettings.parseSoundEffectPercent(
+                        value("--sound-effect-percent","Cobertura de efeitos sonoros (0%, 25%, 50%, 75% ou 100%)","25%"));
+            }
 
             System.out.printf("%n%d cenas; %s; efeito %s; sons %s.%n",project.clips.size(),
-                    imageDirectory==null?"imagens pela OpenAI":"imagens locais",effect.isBlank()?"nenhum":effect,applySounds?"ativados":"desativados");
+                    imageDirectory==null?"imagens pela OpenAI":"imagens locais",effect.isBlank()?"nenhum":effect,
+                    applySounds?"ativados em "+soundsDirectory+" ("+soundEffectPercent+"% de efeitos)":"desativados");
             if(options.containsKey("--dry-run")) {
                 System.out.println("Validação concluída. Nenhum áudio, imagem ou vídeo foi gerado.");
                 return;
@@ -147,7 +156,7 @@ public final class VideoCli {
             concatAudio(ExternalTools.command(settings.ffmpegExecutable,"ffmpeg"),pieces,narration);
             project.narration.file=narration.toString();
             if(applySounds) {
-                var result=SoundApplicator.apply(project,Path.of(settings.soundsDirectory),settings.soundEffectPercent,
+                var result=SoundApplicator.apply(project,soundsDirectory,soundEffectPercent,
                         ExternalTools.command(settings.ffmpegExecutable,"ffmpeg"));
                 System.out.println("Sons aplicados: "+result.addedCount());
             }
@@ -175,6 +184,14 @@ public final class VideoCli {
         for(int i=0;i<project.clips.size();i++)
             if(project.clips.get(i).image.isBlank() && project.clips.get(i).avatar.isBlank())
                 throw new IOException("Falta imagem para a cena "+(i+1)+". Uma cena sem imagem precisa de uma marcação de avatar.");
+    }
+
+    static Path validateSoundsDirectory(Path directory) throws IOException {
+        try(var files=Files.walk(directory)) {
+            if(files.filter(Files::isRegularFile).noneMatch(path->path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".txt")))
+                throw new IOException("A pasta de sons não contém arquivos .txt de descrição: "+directory);
+        }
+        return directory;
     }
 
     private void ensureRessona(RessonaClient client) throws Exception {
@@ -273,7 +290,7 @@ public final class VideoCli {
 
     private static Map<String,String> parse(String[] args) {
         var options=new LinkedHashMap<String,String>();
-        var allowed=Set.of("--name","--script-file","--avatar-dir","--images-dir","--effect","--sounds","--projects-dir","--videos-dir","--ressona-url","--ressona-home","--engine","--voice","--reference-text");
+        var allowed=Set.of("--name","--script-file","--avatar-dir","--images-dir","--effect","--sounds","--sounds-dir","--sound-effect-percent","--projects-dir","--videos-dir","--ressona-url","--ressona-home","--engine","--voice","--reference-text");
         for(int i=0;i<args.length;i++) {
             String arg=args[i];
             if(arg.equals("--help")||arg.equals("--dry-run")) { options.put(arg,""); continue; }
@@ -317,6 +334,7 @@ public final class VideoCli {
                 +"Sem opções, abre o assistente interativo. Termine o roteiro colado com ::fim.\n"
                 +"--script-file ARQUIVO --name NOME --avatar-dir PASTA --images-dir PASTA\n"
                 +"--effect none|smooth|particles|shake --sounds s|n\n"
+                +"--sounds-dir PASTA --sound-effect-percent 0|25|50|75|100 (padrão: 25)\n"
                 +"--ressona-url URL --ressona-home PASTA --engine MOTOR --voice ID\n"
                 +"--reference-text TEXTO (para voz clonada do OmniVoice)\n"
                 +"--projects-dir PASTA --videos-dir PASTA --dry-run");
