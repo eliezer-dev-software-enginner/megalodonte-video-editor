@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+ARGS_FILE="$(mktemp)"
+trap 'rm -f -- "$ARGS_FILE"' EXIT
+for arg in "$@"; do printf '.' >> "$ARGS_FILE"; printf '%s' "$arg" | base64 -w 0 >> "$ARGS_FILE"; printf '\n' >> "$ARGS_FILE"; done
+bash gradlew --quiet videoCli --console=plain "-PcliArgFile=$ARGS_FILE"

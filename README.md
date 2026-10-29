@@ -12,6 +12,25 @@ bash gradlew run
 
 No Windows, execute `./run.ps1` no PowerShell. O build procura `../../framework/megalodonte-declarative/megalodonte-script-app` e o inclui como composite build quando essa pasta existe. Sem ela, a dependência `megalodonte:megalodonte-script-app:0.1.0` precisa estar disponível no Maven local ou em um repositório configurado. As dependências do próprio script app, incluindo componentes JSONC UI, também precisam estar resolvíveis. Este repositório não distribui esses artefatos.
 
+### Criar um vídeo inteiramente pelo terminal (Linux)
+
+Execute `./video-cli` na pasta do editor. O assistente pede o nome, o roteiro, a pasta opcional de avatares, imagens locais ou geração de imagens pela OpenAI, efeito visual e aplicação de sons. Cole o roteiro em várias linhas, separando cenas com uma linha vazia, e encerre com uma linha contendo apenas `::fim` (também aceita `::Fim` ou `::FIM`, com espaços ao redor). As marcações `#nome-do-avatar.png` funcionam como no editor; informe a pasta que contém esses PNGs. Depois de usar uma pasta, o CLI lembra seu caminho e, na próxima execução interativa, pergunta se você quer reaproveitá-la. Responda **n** para informar outra; uma pasta removida não é reaproveitada. A opção `--avatar-dir` escolhe a pasta diretamente, sem fazer essa pergunta. Para usar imagens próprias, coloque uma por cena em uma pasta, com nomes em ordem (`001.png`, `002.png` etc.). Se deixar essa pasta vazia, o CLI gera imagens pela OpenAI usando a chave salva nas Configurações do editor ou `OPENAI_API_KEY`; essa chamada pode ter custo.
+
+O CLI usa o [Ressoa Linux Port](../../../outros/open-source-comunidade/ressona-linux-port/README.md) para narrar cada cena em português. Com o Ressoa já ativo em `http://127.0.0.1:8768`, ele encontra as vozes do motor escolhido. Se não estiver ativo, informe a pasta da instalação, que deve conter `run-linux.sh`, ou defina `RESSONA_HOME`; o CLI inicia o serviço e o encerra ao terminar. O efeito visual inicial é `smooth`. O CLI lista todos os motores disponíveis para uso e suas vozes compatíveis, aceitando o número ou o ID mostrado. O primeiro motor sugerido é `supertonic3` quando instalado. A escolha do motor e a voz escolhida para cada motor são lembradas nas próximas execuções em `video-cli-ressona.properties`, na pasta de configurações do editor; se deixarem de estar disponíveis, o CLI sugere uma opção válida. É necessário instalar previamente o motor e suas vozes no Ressoa. Para uma voz clonada do OmniVoice, o assistente também pede a transcrição exata do áudio de referência (`--reference-text` no modo com opções). Também são necessários FFmpeg e FFprobe, configuráveis em **Configurações → Ferramentas** do editor.
+
+Cada fala é gerada separadamente, sem pausa adicionada pelo Ressoa. Esses trabalhos internos não enviam notificações do Ressoa nem criam cópias soltas em Downloads. O FFprobe mede a duração de cada WAV, o FFmpeg junta a narração, e a duração da cena acompanha o áudio correspondente. Se optar por sons, o CLI usa a biblioteca, a cobertura de efeitos e os caminhos de ferramentas já definidos nas Configurações do desktop. Ao final, grava um projeto editável em `projects/<nome>/<nome>.mvideo.json` e o MP4 em `videos/<nome>.mp4`, ambos relativos à pasta do editor. Nomes já existentes recebem um sufixo numérico; o CLI não substitui um vídeo ou projeto anterior. O processo mostra o andamento no terminal. Se falhar depois de começar, o projeto parcial permanece na pasta de projetos para inspeção.
+
+Para usar arquivos e opções sem responder ao assistente, por exemplo:
+
+```bash
+./video-cli --name meu-video --script-file /caminho/roteiro.txt \
+  --images-dir /caminho/imagens --avatar-dir /caminho/avatares \
+  --effect smooth --sounds s --ressona-home /caminho/ressona-linux-port \
+  --engine supertonic3 --voice supertonic3-M1
+```
+
+Use `./video-cli --help` para ver todas as opções. `--dry-run` valida roteiro, marcações de avatar e imagens sem gerar áudio, chamar a OpenAI ou exportar. O CLI e o editor compartilham o mesmo formato de projeto; o projeto produzido no terminal pode ser aberto e ajustado na interface gráfica.
+
 ## Fluxo atual
 
 1. Cole o roteiro no painel à direita, separando as cenas com uma linha em branco.

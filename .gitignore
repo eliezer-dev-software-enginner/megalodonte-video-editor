@@ -12,6 +12,7 @@ build/
 __pycache__/
 
 /projects/
+/videos/
 
 /.local-asr/
 /tools/__pycache__/

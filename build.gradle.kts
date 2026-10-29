@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.util.Base64
+
 plugins {
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
@@ -46,4 +49,18 @@ tasks.test {
 }
 tasks.named<JavaExec>("run") {
     providers.gradleProperty("initialProject").orNull?.let { systemProperty("megalodonte.editor.initialProject", file(it).absolutePath) }
+}
+
+tasks.register<JavaExec>("videoCli") {
+    group = "application"
+    description = "Cria e exporta um vídeo pelo terminal usando o Ressoa"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("megalodonte.cliente.VideoCli")
+    standardInput = System.`in`
+    providers.gradleProperty("cliArgFile").orNull?.let { path ->
+        val encoded = Files.readString(file(path).toPath())
+        args(encoded.lineSequence().filter { it.isNotBlank() }.map {
+            String(Base64.getDecoder().decode(it.drop(1)), Charsets.UTF_8)
+        }.toList())
+    }
 }
