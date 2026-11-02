@@ -48,13 +48,15 @@ public final class Editor extends ViewScript {
         if(generationBusy()) return;
         pausePlayback();
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
+        try { var latest=settingsStore.load();settings=settings.withImagesDirectory(latest.imagesDirectory).withWhisperLanguage(latest.whisperLanguage); }
+        catch(java.io.IOException e) { message("Não foi possível ler a biblioteca global de imagens: "+e.getMessage());return; }
         settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,
                 settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
                 settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent,
                 settings.pythonExecutable,settings.ffmpegExecutable,settings.ffprobeExecutable,
-                settings.whisperScriptsDirectory,settings.whisperModelsDirectory,settings.notifyTelegram),project.avatarDirectory,(values,avatarDirectory) -> {
+                settings.whisperScriptsDirectory,settings.whisperModelsDirectory,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             project.avatarDirectory=avatarDirectory;
             if(!project.clips.isEmpty()) {
@@ -87,20 +89,21 @@ public final class Editor extends ViewScript {
         if(generationBusy()) return;
         if(imageJob!=null) return;
         OpenAiImageClient client;
-        try { ImageGenerationJob.pending(project); client=OpenAiImageClient.fromSessionKey(text("openaiKey")); }
+        try { settings=settings.withImagesDirectory(settingsStore.load().imagesDirectory);ImageGenerationJob.pending(project); client=OpenAiImageClient.fromSessionKey(text("openaiKey")); }
         catch(Exception e) { message(e.getMessage()); return; }
         if(projectFile==null) { message("Salve o projeto antes de gerar imagens para guardar os PNGs junto aos assets."); return; }
         pausePlayback(); project.script=text("roteiro");
         var snapshot=project.snapshot(); var targetProject=project;
         var job=new ImageGenerationJob(client); imageJob=job;set("gerandoImagens",true);set("iaStatus","Preparando imagens…");
         Path assets=projectFile.getParent().resolve(projectFile.getFileName()+".assets").resolve("generated");
+        final Path imagesLibrary=Path.of(settings.imagesDirectory);
         final boolean notifyOnCompletion=settings.notifyTelegram;
         final Path generationProjectFile=projectFile;
         logJob("Imagens","Iniciando geração para "+generationProjectFile.getFileName()+".");
         imageThread=Thread.ofPlatform().daemon(true).name("openai-images").start(()-> {
             String outcome; boolean cancelled=false;
             try {
-                job.run(snapshot,assets,(index,file)-> {
+                job.run(snapshot,assets,imagesLibrary,(index,file)-> {
                     var applied=new java.util.concurrent.CompletableFuture<Void>();
                     javafx.application.Platform.runLater(()-> {
                         if(disposed || imageJob!=job || job.cancelled() || project!=targetProject) { applied.completeExceptionally(new java.util.concurrent.CancellationException());return; }
@@ -134,6 +137,8 @@ public final class Editor extends ViewScript {
 
     public void syncNarration() {
         if(generationBusy()) return;
+        try { settings=settings.withWhisperLanguage(settingsStore.load().whisperLanguage); }
+        catch(java.io.IOException e) { message("Não foi possível ler o idioma da narração: "+e.getMessage());return; }
         if(project.narration.file.isBlank()) { message("Anexe uma narração antes de sincronizar."); return; }
         if(project.clips.isEmpty()) { message("Crie as cenas do roteiro antes de sincronizar."); return; }
         if(projectFile==null) { message("Salve o projeto antes de sincronizar a narração."); return; }

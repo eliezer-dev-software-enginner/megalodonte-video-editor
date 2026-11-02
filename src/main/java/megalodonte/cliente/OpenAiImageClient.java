@@ -25,6 +25,7 @@ final class OpenAiImageClient {
             setting("OPENAI_IMAGE_SIZE","1536x864"),setting("OPENAI_IMAGE_QUALITY","low"),URI.create("https://api.openai.com/v1/images/generations"));
     }
     private static String setting(String name,String fallback) { String value=System.getenv(name);return value==null || value.isBlank() ? fallback : value.strip(); }
+    String cacheIdentity() { return model+"\n"+size+"\n"+quality; }
     byte[] generate(String prompt) throws IOException,InterruptedException {
         var body=new JsonObject();body.addProperty("model",model);body.addProperty("prompt",prompt);body.addProperty("n",1);
         body.addProperty("size",size);body.addProperty("quality",quality);body.addProperty("output_format","png");

@@ -51,12 +51,18 @@ final class RessonaClient {
 
     void synthesize(String text, String engine, String voice, String referenceText, Path target, Consumer<String> progress)
             throws IOException, InterruptedException {
+        synthesize(text,engine,voice,referenceText,"pt",target,progress);
+    }
+
+    void synthesize(String text, String engine, String voice, String referenceText, String language, Path target, Consumer<String> progress)
+            throws IOException, InterruptedException {
+        if(!Set.of("pt","en").contains(language))throw new IllegalArgumentException("Idioma de narração inválido.");
         var body = new JsonObject();
         body.addProperty("text", text);
         body.addProperty("engine_id", engine);
         body.addProperty("voice_id", voice);
         if(!referenceText.isBlank()) body.addProperty("reference_text",referenceText);
-        body.addProperty("language", "pt");
+        body.addProperty("language", language);
         body.addProperty("pause_ms", 0);
         body.addProperty("auto_delivery", false);
         var job = JsonParser.parseString(new String(request("POST", "api/jobs", body.toString(), Duration.ofSeconds(30)))).getAsJsonObject();

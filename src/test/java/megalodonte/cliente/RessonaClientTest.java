@@ -50,6 +50,9 @@ class RessonaClientTest {
                 assertTrue(body.get().contains("\"pause_ms\":0"));
                 assertTrue(body.get().contains("\"auto_delivery\":false"));
                 assertTrue(body.get().contains("Primeira cena."));
+                assertTrue(body.get().contains("\"language\":\"pt\""));
+                client.synthesize("First scene.","supertonic3","supertonic3-M1","","en",file,ignored->{});
+                assertTrue(body.get().contains("\"language\":\"en\""));
             } finally { Files.deleteIfExists(file); }
         } finally { server.stop(0); }
     }
@@ -75,5 +78,13 @@ class RessonaClientTest {
         assertTrue(VideoCli.isScriptTerminator("::Fim"));
         assertTrue(VideoCli.isScriptTerminator("  ::FIM  "));
         assertFalse(VideoCli.isScriptTerminator("A palavra ::fim está no roteiro."));
+    }
+
+    @Test void narrationLanguagesAndEngineCapabilitiesAreValidated() {
+        assertEquals("pt",VideoCli.narrationLanguage("pt-BR"));
+        assertEquals("en",VideoCli.narrationLanguage("en-US"));
+        assertThrows(IllegalArgumentException.class,()->VideoCli.narrationLanguage("es"));
+        var engine=com.google.gson.JsonParser.parseString("{\"languages\":[\"pt\",\"en\"]}").getAsJsonObject();
+        assertTrue(VideoCli.supportsLanguage(engine,"en"));assertFalse(VideoCli.supportsLanguage(engine,"es"));
     }
 }

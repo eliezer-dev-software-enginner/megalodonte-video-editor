@@ -10,7 +10,7 @@ import java.util.stream.*;
 /** Terminal workflow using the same project, image, sound and export services as the desktop editor. */
 public final class VideoCli {
     private final BufferedReader input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-    private final EditorSettings.Values settings;
+    private EditorSettings.Values settings;
     private final Map<String,String> options;
     private Process startedRessona;
 
@@ -46,6 +46,12 @@ public final class VideoCli {
             String images=value("--images-dir","Pasta com imagens das cenas (vazio para gerar pela OpenAI)","");
             Path imageDirectory=images.isBlank()?null:directory(images,"imagens");
             if(imageDirectory!=null) assignImages(project,imageDirectory);
+            String library=value("--image-library","Biblioteca global de imagens geradas",settings.imagesDirectory);
+            library=EditorSettings.normalizeImages(library);
+            if(!options.containsKey("--dry-run") && !library.equals(settings.imagesDirectory)) {
+                new EditorSettings().saveImagesDirectory(library);settings=settings.withImagesDirectory(library);
+            }
+            String language=narrationLanguage(value("--language","Idioma da narração: pt-BR ou en-US",settings.whisperLanguage.equals("en")?"en-US":"pt-BR"));
             String defaultEffect="smooth";
             String effect=value("--effect","Efeito visual: none, smooth, particles ou shake",defaultEffect).toLowerCase(Locale.ROOT);
             if(effect.equals("none")) effect="";
@@ -66,12 +72,15 @@ public final class VideoCli {
                         value("--sound-effect-percent","Cobertura de efeitos sonoros (0%, 25%, 50%, 75% ou 100%)","25%"));
             }
 
-            System.out.printf("%n%d cenas; %s; efeito %s; sons %s.%n",project.clips.size(),
-                    imageDirectory==null?"imagens pela OpenAI":"imagens locais",effect.isBlank()?"nenhum":effect,
+            System.out.printf("%n%d cenas; %s; narração %s; efeito %s; sons %s.%n",project.clips.size(),
+                    imageDirectory==null?"imagens pela OpenAI":"imagens locais",language.equals("en")?"inglês americano":"português brasileiro",effect.isBlank()?"nenhum":effect,
                     applySounds?"ativados em "+soundsDirectory+" ("+soundEffectPercent+"% de efeitos)":"desativados");
             if(options.containsKey("--dry-run")) {
                 System.out.println("Validação concluída. Nenhum áudio, imagem ou vídeo foi gerado.");
                 return;
+            }
+            if(!language.equals(settings.whisperLanguage)) {
+                new EditorSettings().saveNarrationLanguage(language);settings=settings.withWhisperLanguage(language);
             }
             if(imageDirectory==null) {
                 String key=settings.apiKey.isBlank()?System.getenv().getOrDefault("OPENAI_API_KEY",""):settings.apiKey;
@@ -81,8 +90,8 @@ public final class VideoCli {
             var ressona=new RessonaClient(url);
             ensureRessona(ressona);
             var catalog=ressona.engines();
-            var availableEngines=catalog.stream().filter(item->item.has("available") && item.get("available").getAsBoolean()).toList();
-            if(availableEngines.isEmpty()) throw new IOException("Nenhum motor do Ressoa está instalado e pronto para uso.");
+            var availableEngines=catalog.stream().filter(item->item.has("available") && item.get("available").getAsBoolean() && supportsLanguage(item,language)).toList();
+            if(availableEngines.isEmpty()) throw new IOException("Nenhum motor do Ressoa está instalado e disponível para o idioma escolhido.");
             System.out.println("Motores disponíveis:");
             for(int i=0;i<availableEngines.size();i++) {
                 var item=availableEngines.get(i);
@@ -90,7 +99,7 @@ public final class VideoCli {
             }
             for(var item:catalog) if(!availableEngines.contains(item))
                 System.out.printf("  • %s [%s] — indisponível (%s)%n",item.get("name").getAsString(),
-                        item.get("id").getAsString(),item.get("status").getAsString());
+                        item.get("id").getAsString(),!supportsLanguage(item,language)?"não suporta o idioma escolhido":item.get("status").getAsString());
             var choiceHistory=new CliRessonaHistory();
             String rememberedEngine=choiceHistory.engine();
             String preferredEngine=availableEngines.stream().anyMatch(item->rememberedEngine.equals(item.get("id").getAsString()))
@@ -137,7 +146,7 @@ public final class VideoCli {
             if(!project.avatarDirectory.isBlank()) new CliAvatarHistory().remember(Path.of(project.avatarDirectory));
             if(imageDirectory==null) {
                 String key=settings.apiKey.isBlank()?System.getenv().getOrDefault("OPENAI_API_KEY",""):settings.apiKey;
-                new ImageGenerationJob(OpenAiImageClient.fromSessionKey(key)).run(project,assets,
+                new ImageGenerationJob(OpenAiImageClient.fromSessionKey(key)).run(project,assets,Path.of(library),
                         (index,file)->{ project.clips.get(index).image=file.toString(); save(project,manifest); },System.out::println);
             }
             project.save(manifest);
@@ -147,7 +156,7 @@ public final class VideoCli {
             for(int i=0;i<project.clips.size();i++) {
                 Path wav=assets.resolve(String.format(Locale.ROOT,"narracao-%03d.wav",i+1));
                 System.out.printf("Narrando cena %d/%d…%n",i+1,project.clips.size());
-                ressona.synthesize(project.clips.get(i).text,engine,voice,referenceText,wav,System.out::println);
+                ressona.synthesize(project.clips.get(i).text,engine,voice,referenceText,language,wav,System.out::println);
                 project.clips.get(i).duration=probeDuration(ffprobe,wav);
                 pieces.add(wav);
                 project.save(manifest);
@@ -184,6 +193,18 @@ public final class VideoCli {
         for(int i=0;i<project.clips.size();i++)
             if(project.clips.get(i).image.isBlank() && project.clips.get(i).avatar.isBlank())
                 throw new IOException("Falta imagem para a cena "+(i+1)+". Uma cena sem imagem precisa de uma marcação de avatar.");
+    }
+    static String narrationLanguage(String value) {
+        return switch(value.strip().toLowerCase(Locale.ROOT)) {
+            case "pt", "pt-br" -> "pt";
+            case "en", "en-us" -> "en";
+            default -> throw new IllegalArgumentException("Escolha pt-BR ou en-US para a narração.");
+        };
+    }
+    static boolean supportsLanguage(JsonObject engine,String language) {
+        if(!engine.has("languages")||!engine.get("languages").isJsonArray())return true;
+        for(var item:engine.getAsJsonArray("languages"))if(language.equalsIgnoreCase(item.getAsString()))return true;
+        return false;
     }
 
     static Path validateSoundsDirectory(Path directory) throws IOException {
@@ -290,7 +311,7 @@ public final class VideoCli {
 
     private static Map<String,String> parse(String[] args) {
         var options=new LinkedHashMap<String,String>();
-        var allowed=Set.of("--name","--script-file","--avatar-dir","--images-dir","--effect","--sounds","--sounds-dir","--sound-effect-percent","--projects-dir","--videos-dir","--ressona-url","--ressona-home","--engine","--voice","--reference-text");
+        var allowed=Set.of("--name","--script-file","--avatar-dir","--images-dir","--image-library","--language","--effect","--sounds","--sounds-dir","--sound-effect-percent","--projects-dir","--videos-dir","--ressona-url","--ressona-home","--engine","--voice","--reference-text");
         for(int i=0;i<args.length;i++) {
             String arg=args[i];
             if(arg.equals("--help")||arg.equals("--dry-run")) { options.put(arg,""); continue; }
@@ -333,6 +354,8 @@ public final class VideoCli {
         System.out.println("Uso: ./video-cli [opções]\n"
                 +"Sem opções, abre o assistente interativo. Termine o roteiro colado com ::fim.\n"
                 +"--script-file ARQUIVO --name NOME --avatar-dir PASTA --images-dir PASTA\n"
+                +"--image-library PASTA (biblioteca global, compartilhada com o aplicativo)\n"
+                +"--language pt-BR|en-US (idioma da narração)\n"
                 +"--effect none|smooth|particles|shake --sounds s|n\n"
                 +"--sounds-dir PASTA --sound-effect-percent 0|25|50|75|100 (padrão: 25)\n"
                 +"--ressona-url URL --ressona-home PASTA --engine MOTOR --voice ID\n"

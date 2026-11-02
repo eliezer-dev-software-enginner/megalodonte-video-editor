@@ -49,6 +49,7 @@ class EditorViewTest {
                 var settingsRoot=settingsStage.getScene().getRoot(); settingsRoot.applyCss();settingsRoot.layout();
                 var keyField=(PasswordField)settingsRoot.lookup(".password-field");
                 var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Diretório de sons e efeitos".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
+                var imagesField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Pasta compartilhada de imagens geradas".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var pauseField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "1,0".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
@@ -67,6 +68,11 @@ class EditorViewTest {
                     .filter(n->n instanceof ComboBox<?> box && box.getItems().contains("50% de efeitos sonoros"))
                     .map(n->(ComboBox<String>)n).findFirst().orElseThrow();
                 assertEquals("100% de efeitos sonoros",effectCoverage.getValue());
+                var narrationLanguage=settingsRoot.lookupAll(".combo-box").stream()
+                    .filter(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en","auto")))
+                    .map(n->(ComboBox<String>)n).findFirst().orElseThrow();
+                narrationLanguage.setValue("en");
+                var imagesFolder=Files.createTempDirectory("editor-images-");imagesField.setText(imagesFolder.toString());
                 effectCoverage.setValue("50% de efeitos sonoros");
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
                 folderField.setText("/diretorio-inexistente-para-teste");
@@ -80,6 +86,7 @@ class EditorViewTest {
                 Files.createDirectories(Path.of("build/preview"));ImageIO.write(settingsPng,"png",Path.of("build/preview/settings-window.png").toFile());
                 saveSettings.fire();assertFalse(settingsStage.isShowing());assertEquals("dummy-settings-key",session.states().get("openaiKey"));
                 var persisted=new EditorSettings().load();assertEquals(soundsFolder.toString(),persisted.soundsDirectory);assertEquals("Prompt editado e salvo",persisted.basePrompt);
+                assertEquals(imagesFolder.toString(),persisted.imagesDirectory);assertEquals("en",persisted.whisperLanguage);
                 assertEquals(1.7,persisted.pauseCutThreshold);
                 assertEquals(50,persisted.soundEffectPercent);
                 try(var restarted=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
@@ -87,7 +94,10 @@ class EditorViewTest {
                 }
                 session.invoke("openSettings");
                 var reopened=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream().filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
-                reopened.getScene().getRoot().applyCss();((TextArea)reopened.getScene().getRoot().lookup(".text-area")).setText("Não salvar");reopened.close();
+                reopened.getScene().getRoot().applyCss();
+                assertTrue(reopened.getScene().getRoot().lookupAll(".text-field").stream().anyMatch(n->n instanceof TextField field && "Pasta compartilhada de imagens geradas".equals(field.getPromptText()) && imagesFolder.toString().equals(field.getText())));
+                assertTrue(reopened.getScene().getRoot().lookupAll(".combo-box").stream().anyMatch(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en","auto")) && "en".equals(box.getValue())));
+                ((TextArea)reopened.getScene().getRoot().lookup(".text-area")).setText("Não salvar");reopened.close();
                 assertEquals("Prompt editado e salvo",new EditorSettings().load().basePrompt);
                 Files.delete(Path.of(System.getProperty("megalodonte.editor.settingsDir"),"editor-settings.json"));session.states().set("openaiKey","");
                 assertEquals("15.0",session.states().get("volumeMusica"));

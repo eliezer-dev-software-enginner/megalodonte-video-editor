@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('project', type=Path)
     parser.add_argument('--model', default='small')
-    parser.add_argument('--language', choices=('pt', 'auto'), default='pt')
+    parser.add_argument('--language', choices=('pt', 'en', 'auto'), default='pt')
     parser.add_argument('--beam-size', type=int, default=5)
     parser.add_argument('--cpu-threads', type=int, default=4)
     parser.add_argument('--vad', choices=('true', 'false'), default='true')

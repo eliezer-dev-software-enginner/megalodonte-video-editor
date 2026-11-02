@@ -10,6 +10,10 @@
       "type": "string",
       "initial": ""
     },
+    "imagesDirectory": {
+      "type": "string",
+      "initial": ""
+    },
     "basePrompt": {
       "type": "string",
       "initial": ""
@@ -302,6 +306,23 @@
                       },
                       {
                         "type": "Text",
+                        "props": { "text": "Biblioteca global de imagens" }
+                      },
+                      {
+                        "type": "Input", "id": "imagesDirectoryInput",
+                        "props": { "height": 36, "width": 530, "placeholder": "Pasta compartilhada de imagens geradas" },
+                        "bind": { "value": "imagesDirectory" }
+                      },
+                      {
+                        "type": "Button", "id": "chooseImagesButton",
+                        "props": { "text": "Selecionar pasta de imagens…", "height": 36 },
+                        "events": { "onClick": "chooseImages" }
+                      },
+                      {
+                        "type": "Text", "props": { "text": "Imagens geradas ficam nesta biblioteca e podem ser reutilizadas em outros projetos.", "wrapWidth": 520 }
+                      },
+                      {
+                        "type": "Text",
                         "props": {
                           "text": "Biblioteca de sons"
                         }
@@ -491,7 +512,7 @@
                       {
                         "type": "Text",
                         "props": {
-                          "text": "Idioma"
+                          "text": "Idioma da narração para sincronização e para novas narrações no CLI"
                         }
                       },
                       {
@@ -505,6 +526,10 @@
                           "value": "whisperLanguage",
                           "items": "whisperLanguageOptions"
                         }
+                      },
+                      {
+                        "type": "Text",
+                        "props": { "text": "Use o roteiro no idioma escolhido. No Ressoa, o sotaque depende da voz e do motor.", "wrapWidth": 520 }
                       },
                       {
                         "type": "Text",

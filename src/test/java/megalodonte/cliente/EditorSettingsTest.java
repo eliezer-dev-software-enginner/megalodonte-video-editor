@@ -27,6 +27,9 @@ class EditorSettingsTest {
         assertEquals(1.5,EditorSettings.parsePauseCutThreshold("1,5"));
         assertEquals(values.basePrompt,store.load().basePrompt);
         store.saveApiKey("migrated-key");assertEquals("medium",store.load().whisperModel);
+        Path library=folder.resolve("biblioteca imagens");store.saveImagesDirectory(library.toString());
+        assertEquals(library.toAbsolutePath().normalize().toString(),store.load().imagesDirectory);
+        store.saveApiKey("new-migrated-key");assertEquals(library.toString(),store.load().imagesDirectory);
         assertFalse(store.load().whisperVad);
         assertEquals(50,store.load().soundEffectPercent);
         assertEquals(25,EditorSettings.parseSoundEffectPercent("25% de efeitos sonoros"));

@@ -9,6 +9,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 /** Shared local editor preferences; credentials are never written to project manifests. */
 final class EditorSettings {
     static final String DEFAULT_SOUNDS = "";
+    static final String DEFAULT_IMAGES = Path.of(System.getProperty("user.home"),"Pictures","Megalodonte Video Editor").toString();
     static final double DEFAULT_PAUSE_CUT_THRESHOLD = 1.0;
     static final class Values {
         final String apiKey, soundsDirectory, basePrompt;
@@ -21,6 +22,7 @@ final class EditorSettings {
         final int soundEffectPercent;
         final boolean notifyTelegram;
         final String pythonExecutable, ffmpegExecutable, ffprobeExecutable, whisperScriptsDirectory, whisperModelsDirectory;
+        final String imagesDirectory;
         Values(String apiKey, String soundsDirectory, String basePrompt) {
             this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
         }
@@ -58,6 +60,13 @@ final class EditorSettings {
                int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
                String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
                String whisperScriptsDirectory,String whisperModelsDirectory,boolean notifyTelegram) {
+            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,DEFAULT_IMAGES);
+        }
+        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
+               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
+               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
+               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
+               String whisperScriptsDirectory,String whisperModelsDirectory,boolean notifyTelegram,String imagesDirectory) {
             this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
             this.pauseCutThreshold=pauseCutThreshold;
             this.defaultVisualEffect=defaultVisualEffect;
@@ -69,6 +78,13 @@ final class EditorSettings {
             this.ffprobeExecutable=ffprobeExecutable;this.whisperScriptsDirectory=whisperScriptsDirectory;
             this.whisperModelsDirectory=whisperModelsDirectory;
             this.notifyTelegram=notifyTelegram;
+            this.imagesDirectory=imagesDirectory;
+        }
+        Values withImagesDirectory(String directory) {
+            return new Values(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,directory);
+        }
+        Values withWhisperLanguage(String language) {
+            return new Values(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,language,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,imagesDirectory);
         }
         @Override public String toString() { return "Configurações do editor"; }
     }
@@ -102,7 +118,7 @@ final class EditorSettings {
             return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent,
                     value(json,"pythonExecutable",""),value(json,"ffmpegExecutable",""),value(json,"ffprobeExecutable",""),
                     value(json,"whisperScriptsDirectory",""),value(json,"whisperModelsDirectory",""),
-                    json.has("notifyTelegram") ? json.get("notifyTelegram").getAsBoolean() : true);
+                    json.has("notifyTelegram") ? json.get("notifyTelegram").getAsBoolean() : true,value(json,"imagesDirectory",DEFAULT_IMAGES));
         } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
     }
     void save(Values values) throws IOException {
@@ -124,7 +140,7 @@ final class EditorSettings {
         write(new Values(values.apiKey,directory,values.basePrompt,values.pauseCutThreshold,
                 values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
                 values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent,
-                python,ffmpeg,ffprobe,scripts,models,values.notifyTelegram));
+                python,ffmpeg,ffprobe,scripts,models,values.notifyTelegram,normalizeImages(values.imagesDirectory)));
     }
     /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
@@ -132,12 +148,20 @@ final class EditorSettings {
                 current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
                 current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent,
                 current.pythonExecutable,current.ffmpegExecutable,current.ffprobeExecutable,
-                current.whisperScriptsDirectory,current.whisperModelsDirectory,current.notifyTelegram));
+                current.whisperScriptsDirectory,current.whisperModelsDirectory,current.notifyTelegram,current.imagesDirectory));
+    }
+    void saveImagesDirectory(String directory) throws IOException {
+        write(load().withImagesDirectory(normalizeImages(directory)));
+    }
+    void saveNarrationLanguage(String language) throws IOException {
+        if(!java.util.Set.of("pt","en").contains(language))throw new IllegalArgumentException("Escolha português brasileiro ou inglês americano.");
+        write(load().withWhisperLanguage(language));
     }
     private void write(Values values) throws IOException {
         Files.createDirectories(file.getParent());
         var json=new JsonObject(); json.addProperty("openaiApiKey",values.apiKey.strip());
         json.addProperty("soundsDirectory",values.soundsDirectory); json.addProperty("basePrompt",values.basePrompt);
+        json.addProperty("imagesDirectory",values.imagesDirectory);
         json.addProperty("pauseCutThreshold",values.pauseCutThreshold);
         json.addProperty("defaultVisualEffect",values.defaultVisualEffect);
         json.addProperty("visualEffectStrength",values.visualEffectStrength);
@@ -166,6 +190,12 @@ final class EditorSettings {
         if(!Files.isDirectory(folder) || !Files.isReadable(folder)) throw new IllegalArgumentException("Escolha um diretório de sons existente e legível.");
         return folder;
     }
+    static String normalizeImages(String value) {
+        if(value==null || value.isBlank())throw new IllegalArgumentException("Informe o diretório global de imagens.");
+        Path path=Path.of(value.strip()).toAbsolutePath().normalize();
+        if(Files.exists(path) && !Files.isDirectory(path))throw new IllegalArgumentException("O diretório de imagens não é uma pasta.");
+        return path.toString();
+    }
     static double parsePauseCutThreshold(String value) {
         try { return validatePauseCutThreshold(Double.parseDouble(value.strip().replace(',', '.'))); }
         catch(NumberFormatException e) { throw new IllegalArgumentException("Informe a pausa mínima em segundos (0,1 a 30)."); }
@@ -187,8 +217,8 @@ final class EditorSettings {
     static void validateWhisper(String model,String language,int beam,int threads) {
         if(!java.util.Set.of("tiny","base","small","medium","large-v3").contains(model))
             throw new IllegalArgumentException("Escolha um modelo Whisper válido.");
-        if(!java.util.Set.of("pt","auto").contains(language))
-            throw new IllegalArgumentException("Escolha português ou detecção automática de idioma.");
+        if(!java.util.Set.of("pt","en","auto").contains(language))
+            throw new IllegalArgumentException("Escolha português, inglês ou detecção automática de idioma.");
         if(beam<1 || beam>10) throw new IllegalArgumentException("A busca do Whisper deve ficar entre 1 e 10.");
         if(threads<1 || threads>16) throw new IllegalArgumentException("As threads do Whisper devem ficar entre 1 e 16.");
     }

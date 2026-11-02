@@ -31,6 +31,11 @@ class OpenAiImageIntegrationTest {
             var client=new OpenAiImageClient("dummy-test-key","gpt-image-2","1536x864","low",URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/v1/images/generations"));
             new ImageGenerationJob(client).run(project,directory.resolve("generated"),(index,file)->project.clips.get(index).image=file.toString(),progress->{});
             assertEquals(2,prompts.size());assertTrue(prompts.get(0).endsWith("Cidade ao amanhecer."));assertTrue(prompts.get(1).endsWith("Bicicleta na praça."));
+            var second=VideoProject.fromScript("Cidade ao amanhecer.\n\nBicicleta na praça.");
+            new ImageGenerationJob(client).run(second,directory.resolve("other-project"),directory.resolve("generated"),(index,file)->second.clips.get(index).image=file.toString(),progress->{});
+            assertEquals(2,prompts.size(),"As cenas com mesmo contexto devem reutilizar a biblioteca");
+            assertTrue(Files.isRegularFile(Path.of(second.clips.getFirst().image)));
+            assertTrue(Path.of(second.clips.getFirst().image).getFileName().toString().startsWith("cidade-amanhecer-"));
             assertNotEquals(project.clips.get(0).image,project.clips.get(1).image);
             for(var clip:project.clips) assertNotNull(ImageIO.read(Path.of(clip.image).toFile()));
             Path manifest=directory.resolve("project.json");project.save(manifest);var loaded=VideoProject.load(manifest);

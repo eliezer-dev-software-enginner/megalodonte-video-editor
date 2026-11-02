@@ -34,7 +34,7 @@ final class SettingsWindow implements AutoCloseable {
                     EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()),
                         view.states().string("pythonExecutable").get(),view.states().string("ffmpegExecutable").get(),
                         view.states().string("ffprobeExecutable").get(),view.states().string("whisperScriptsDirectory").get(),
-                        view.states().string("whisperModelsDirectory").get(),notifyTelegram.isSelected());
+                        view.states().string("whisperModelsDirectory").get(),notifyTelegram.isSelected(),EditorSettings.normalizeImages(view.states().string("imagesDirectory").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
@@ -52,6 +52,12 @@ final class SettingsWindow implements AutoCloseable {
               catch(RuntimeException ignored) { }
               var selected=chooser.showDialog(stage);
               if(selected!=null) view.states().set("soundsDirectory",selected.toPath().toAbsolutePath().normalize().toString());
+          }).register("chooseImages",view -> {
+              var chooser=new DirectoryChooser();chooser.setTitle("Selecionar biblioteca global de imagens");
+              try { chooser.setInitialDirectory(FileDialogs.existingFolder(Path.of(view.states().string("imagesDirectory").get())).toFile()); }
+              catch(RuntimeException ignored) { }
+              var selected=chooser.showDialog(stage);
+              if(selected!=null) view.states().set("imagesDirectory",selected.toPath().toAbsolutePath().normalize().toString());
           }).register("chooseAvatar",view -> {
               var chooser=new DirectoryChooser();chooser.setTitle("Selecionar pasta de avatares do projeto");
               try { chooser.setInitialDirectory(FileDialogs.existingFolder(Path.of(view.states().string("avatarDirectory").get())).toFile()); }
@@ -62,6 +68,7 @@ final class SettingsWindow implements AutoCloseable {
         session=UiDefinition.fromResource(SettingsWindow.class,"/views/settings.view.jsonc").open(actions);
         notifyTelegram.setSelected(values.notifyTelegram);
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
+        session.states().set("imagesDirectory",values.imagesDirectory);
         session.states().set("avatarDirectory",avatarDirectory);
         session.states().set("pythonExecutable",values.pythonExecutable);
         session.states().set("ffmpegExecutable",values.ffmpegExecutable);
@@ -74,7 +81,7 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("defaultVisualEffect",values.defaultVisualEffect);
         session.states().set("visualEffectStrength",Double.toString(values.visualEffectStrength));
         session.states().set("whisperModelOptions","[{\"value\":\"tiny\",\"label\":\"Tiny (rápido)\"},{\"value\":\"base\",\"label\":\"Base\"},{\"value\":\"small\",\"label\":\"Small (padrão)\"},{\"value\":\"medium\",\"label\":\"Medium\"},{\"value\":\"large-v3\",\"label\":\"Large v3 (mais pesado)\"}]");
-        session.states().set("whisperLanguageOptions","[{\"value\":\"pt\",\"label\":\"Português\"},{\"value\":\"auto\",\"label\":\"Detectar automaticamente\"}]");
+        session.states().set("whisperLanguageOptions","[{\"value\":\"pt\",\"label\":\"Português brasileiro\"},{\"value\":\"en\",\"label\":\"Inglês americano\"},{\"value\":\"auto\",\"label\":\"Detectar automaticamente\"}]");
         session.states().set("whisperVadOptions","[{\"value\":\"true\",\"label\":\"Ligado\"},{\"value\":\"false\",\"label\":\"Desligado\"}]");
         session.states().set("whisperModel",values.whisperModel);session.states().set("whisperLanguage",values.whisperLanguage);
         session.states().set("whisperBeamSize",Integer.toString(values.whisperBeamSize));
