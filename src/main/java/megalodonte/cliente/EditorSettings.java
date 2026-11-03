@@ -5,238 +5,127 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 /** Shared local editor preferences; credentials are never written to project manifests. */
 final class EditorSettings {
-    static final String DEFAULT_SOUNDS = "";
-    static final String DEFAULT_IMAGES = Path.of(System.getProperty("user.home"),"Pictures","Megalodonte Video Editor").toString();
-    static final double DEFAULT_PAUSE_CUT_THRESHOLD = 1.0;
+    static final String DEFAULT_SOUNDS="";
+    static final String DEFAULT_IMAGES=Path.of(System.getProperty("user.home"),"Pictures","Megalodonte Video Editor").toString();
     static final class Values {
-        final String apiKey, soundsDirectory, basePrompt;
-        final double pauseCutThreshold;
-        final String defaultVisualEffect;
+        final String apiKey,soundsDirectory,basePrompt,defaultVisualEffect,narrationLanguage;
+        final String ffmpegExecutable,ffprobeExecutable,imagesDirectory;
         final double visualEffectStrength;
-        final String whisperModel, whisperLanguage;
-        final int whisperBeamSize, whisperCpuThreads;
-        final boolean whisperVad;
         final int soundEffectPercent;
         final boolean notifyTelegram;
-        final String pythonExecutable, ffmpegExecutable, ffprobeExecutable, whisperScriptsDirectory, whisperModelsDirectory;
-        final String imagesDirectory;
-        Values(String apiKey, String soundsDirectory, String basePrompt) {
-            this(apiKey,soundsDirectory,basePrompt,DEFAULT_PAUSE_CUT_THRESHOLD);
+        Values(String apiKey,String soundsDirectory,String basePrompt) {
+            this(apiKey,soundsDirectory,basePrompt,"none",1,"pt",100,"","",true,DEFAULT_IMAGES);
         }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,"none",1.0);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,"small","pt",5,4,true);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
-               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
-                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,100);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
-               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
-                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,
-                    "","","","","",true);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
-               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
-               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
-               String whisperScriptsDirectory,String whisperModelsDirectory) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,
-                    whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,
-                    pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,true);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
-               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
-               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
-               String whisperScriptsDirectory,String whisperModelsDirectory,boolean notifyTelegram) {
-            this(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,DEFAULT_IMAGES);
-        }
-        Values(String apiKey, String soundsDirectory, String basePrompt,double pauseCutThreshold,
-               String defaultVisualEffect,double visualEffectStrength,String whisperModel,String whisperLanguage,
-               int whisperBeamSize,int whisperCpuThreads,boolean whisperVad,int soundEffectPercent,
-               String pythonExecutable,String ffmpegExecutable,String ffprobeExecutable,
-               String whisperScriptsDirectory,String whisperModelsDirectory,boolean notifyTelegram,String imagesDirectory) {
-            this.apiKey=apiKey; this.soundsDirectory=soundsDirectory; this.basePrompt=basePrompt;
-            this.pauseCutThreshold=pauseCutThreshold;
-            this.defaultVisualEffect=defaultVisualEffect;
-            this.visualEffectStrength=visualEffectStrength;
-            this.whisperModel=whisperModel;this.whisperLanguage=whisperLanguage;
-            this.whisperBeamSize=whisperBeamSize;this.whisperCpuThreads=whisperCpuThreads;this.whisperVad=whisperVad;
-            this.soundEffectPercent=soundEffectPercent;
-            this.pythonExecutable=pythonExecutable;this.ffmpegExecutable=ffmpegExecutable;
-            this.ffprobeExecutable=ffprobeExecutable;this.whisperScriptsDirectory=whisperScriptsDirectory;
-            this.whisperModelsDirectory=whisperModelsDirectory;
-            this.notifyTelegram=notifyTelegram;
-            this.imagesDirectory=imagesDirectory;
+        Values(String apiKey,String soundsDirectory,String basePrompt,String defaultVisualEffect,double visualEffectStrength,
+               String narrationLanguage,int soundEffectPercent,String ffmpegExecutable,String ffprobeExecutable,
+               boolean notifyTelegram,String imagesDirectory) {
+            this.apiKey=apiKey;this.soundsDirectory=soundsDirectory;this.basePrompt=basePrompt;
+            this.defaultVisualEffect=defaultVisualEffect;this.visualEffectStrength=visualEffectStrength;
+            this.narrationLanguage=narrationLanguage;this.soundEffectPercent=soundEffectPercent;
+            this.ffmpegExecutable=ffmpegExecutable;this.ffprobeExecutable=ffprobeExecutable;
+            this.notifyTelegram=notifyTelegram;this.imagesDirectory=imagesDirectory;
         }
         Values withImagesDirectory(String directory) {
-            return new Values(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,whisperLanguage,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,directory);
+            return new Values(apiKey,soundsDirectory,basePrompt,defaultVisualEffect,visualEffectStrength,narrationLanguage,soundEffectPercent,ffmpegExecutable,ffprobeExecutable,notifyTelegram,directory);
         }
-        Values withWhisperLanguage(String language) {
-            return new Values(apiKey,soundsDirectory,basePrompt,pauseCutThreshold,defaultVisualEffect,visualEffectStrength,whisperModel,language,whisperBeamSize,whisperCpuThreads,whisperVad,soundEffectPercent,pythonExecutable,ffmpegExecutable,ffprobeExecutable,whisperScriptsDirectory,whisperModelsDirectory,notifyTelegram,imagesDirectory);
+        Values withNarrationLanguage(String language) {
+            return new Values(apiKey,soundsDirectory,basePrompt,defaultVisualEffect,visualEffectStrength,language,soundEffectPercent,ffmpegExecutable,ffprobeExecutable,notifyTelegram,imagesDirectory);
         }
-        @Override public String toString() { return "Configurações do editor"; }
+        @Override public String toString() {return "Configurações do editor";}
     }
     private final Path file;
-    EditorSettings() { this(LastProjectStore.settingsDirectory().resolve("editor-settings.json")); }
-    EditorSettings(Path file) { this.file=file.toAbsolutePath(); }
-    boolean exists() { return Files.isRegularFile(file); }
+    EditorSettings() {this(LastProjectStore.settingsDirectory().resolve("editor-settings.json"));}
+    EditorSettings(Path file) {this.file=file.toAbsolutePath();}
+    boolean exists() {return Files.isRegularFile(file);}
     static String defaultPrompt() {
         try(var stream=EditorSettings.class.getResourceAsStream("/prompts/base-video.md")) {
-            if(stream==null) throw new IllegalStateException("Prompt base padrão ausente.");
+            if(stream==null)throw new IllegalStateException("Prompt base padrão ausente.");
             return new String(stream.readAllBytes(),StandardCharsets.UTF_8);
-        } catch(IOException e) { throw new UncheckedIOException(e); }
+        } catch(IOException e) {throw new UncheckedIOException(e);}
     }
     Values load() throws IOException {
-        if(!exists()) return new Values("",DEFAULT_SOUNDS,defaultPrompt());
+        if(!exists())return new Values("",DEFAULT_SOUNDS,defaultPrompt());
         try {
             var json=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-            double threshold=json.has("pauseCutThreshold") ? json.get("pauseCutThreshold").getAsDouble() : DEFAULT_PAUSE_CUT_THRESHOLD;
-            validatePauseCutThreshold(threshold);
-            String effect=value(json,"defaultVisualEffect","none");
-            validateVisualEffect(effect);
-            double strength=json.has("visualEffectStrength") ? json.get("visualEffectStrength").getAsDouble() : 1.0;
+            String effect=validateVisualEffect(value(json,"defaultVisualEffect","none"));
+            double strength=json.has("visualEffectStrength")?json.get("visualEffectStrength").getAsDouble():1;
             VideoProject.validateVisualEffectStrength(strength);
-            String model=value(json,"whisperModel","small"),language=value(json,"whisperLanguage","pt");
-            int beam=json.has("whisperBeamSize")?json.get("whisperBeamSize").getAsInt():5;
-            int threads=json.has("whisperCpuThreads")?json.get("whisperCpuThreads").getAsInt():4;
-            boolean vad=json.has("whisperVad")?json.get("whisperVad").getAsBoolean():true;
-            int soundEffectPercent=json.has("soundEffectPercent")?json.get("soundEffectPercent").getAsInt():100;
-            validateWhisper(model,language,beam,threads);
-            validateSoundEffectPercent(soundEffectPercent);
-            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),threshold,effect,strength,model,language,beam,threads,vad,soundEffectPercent,
-                    value(json,"pythonExecutable",""),value(json,"ffmpegExecutable",""),value(json,"ffprobeExecutable",""),
-                    value(json,"whisperScriptsDirectory",""),value(json,"whisperModelsDirectory",""),
-                    json.has("notifyTelegram") ? json.get("notifyTelegram").getAsBoolean() : true,value(json,"imagesDirectory",DEFAULT_IMAGES));
-        } catch(RuntimeException e) { throw new IOException("Arquivo de configurações inválido."); }
+            String legacy=value(json,"whisperLanguage","pt");
+            String language=value(json,"narrationLanguage",Set.of("pt","en").contains(legacy)?legacy:"pt");
+            validateNarrationLanguage(language);
+            int percent=json.has("soundEffectPercent")?json.get("soundEffectPercent").getAsInt():100;
+            validateSoundEffectPercent(percent);
+            return new Values(value(json,"openaiApiKey",""),value(json,"soundsDirectory",DEFAULT_SOUNDS),value(json,"basePrompt",defaultPrompt()),
+                    effect,strength,language,percent,value(json,"ffmpegExecutable",""),value(json,"ffprobeExecutable",""),
+                    json.has("notifyTelegram")?json.get("notifyTelegram").getAsBoolean():true,value(json,"imagesDirectory",DEFAULT_IMAGES));
+        } catch(RuntimeException e) {throw new IOException("Arquivo de configurações inválido.");}
     }
     void save(Values values) throws IOException {
-        String directory=values.soundsDirectory.isBlank() ? "" : validateSounds(values.soundsDirectory).toString();
-        if(values.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
-        validatePauseCutThreshold(values.pauseCutThreshold);
-        validateVisualEffect(values.defaultVisualEffect);
-        VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
-        validateWhisper(values.whisperModel,values.whisperLanguage,values.whisperBeamSize,values.whisperCpuThreads);
-        validateSoundEffectPercent(values.soundEffectPercent);
-        String python=ExternalTools.validateExecutable(values.pythonExecutable,"Python");
-        String ffmpeg=ExternalTools.validateExecutable(values.ffmpegExecutable,"FFmpeg");
-        String ffprobe=ExternalTools.validateExecutable(values.ffprobeExecutable,"FFprobe");
-        String scripts=ExternalTools.validateDirectory(values.whisperScriptsDirectory,"scripts do Whisper");
-        String models=ExternalTools.validateDirectory(values.whisperModelsDirectory,"modelos do Whisper");
-        if(!scripts.isBlank() && (!Files.isRegularFile(Path.of(scripts,"tools","transcribe_narration.py")) ||
-                !Files.isRegularFile(Path.of(scripts,"tools","sync_narration.py"))))
-            throw new IllegalArgumentException("A pasta dos scripts deve conter tools/transcribe_narration.py e tools/sync_narration.py.");
-        write(new Values(values.apiKey,directory,values.basePrompt,values.pauseCutThreshold,
-                values.defaultVisualEffect,values.visualEffectStrength,values.whisperModel,values.whisperLanguage,
-                values.whisperBeamSize,values.whisperCpuThreads,values.whisperVad,values.soundEffectPercent,
-                python,ffmpeg,ffprobe,scripts,models,values.notifyTelegram,normalizeImages(values.imagesDirectory)));
+        String sounds=values.soundsDirectory.isBlank()?"":validateSounds(values.soundsDirectory).toString();
+        if(values.basePrompt.isBlank())throw new IllegalArgumentException("Informe um prompt base.");
+        validateVisualEffect(values.defaultVisualEffect);VideoProject.validateVisualEffectStrength(values.visualEffectStrength);
+        validateNarrationLanguage(values.narrationLanguage);validateSoundEffectPercent(values.soundEffectPercent);
+        write(new Values(values.apiKey,sounds,values.basePrompt,values.defaultVisualEffect,values.visualEffectStrength,values.narrationLanguage,
+                values.soundEffectPercent,ExternalTools.validateExecutable(values.ffmpegExecutable,"FFmpeg"),
+                ExternalTools.validateExecutable(values.ffprobeExecutable,"FFprobe"),values.notifyTelegram,normalizeImages(values.imagesDirectory)));
     }
-    /** Migrate a legacy project key without requiring its old sound folder to exist. */
     void saveApiKey(String apiKey) throws IOException {
-        var current=load();write(new Values(apiKey,current.soundsDirectory,current.basePrompt,current.pauseCutThreshold,
-                current.defaultVisualEffect,current.visualEffectStrength,current.whisperModel,current.whisperLanguage,
-                current.whisperBeamSize,current.whisperCpuThreads,current.whisperVad,current.soundEffectPercent,
-                current.pythonExecutable,current.ffmpegExecutable,current.ffprobeExecutable,
-                current.whisperScriptsDirectory,current.whisperModelsDirectory,current.notifyTelegram,current.imagesDirectory));
+        var v=load();write(new Values(apiKey,v.soundsDirectory,v.basePrompt,v.defaultVisualEffect,v.visualEffectStrength,v.narrationLanguage,
+                v.soundEffectPercent,v.ffmpegExecutable,v.ffprobeExecutable,v.notifyTelegram,v.imagesDirectory));
     }
-    void saveImagesDirectory(String directory) throws IOException {
-        write(load().withImagesDirectory(normalizeImages(directory)));
-    }
-    void saveNarrationLanguage(String language) throws IOException {
-        if(!java.util.Set.of("pt","en").contains(language))throw new IllegalArgumentException("Escolha português brasileiro ou inglês americano.");
-        write(load().withWhisperLanguage(language));
-    }
-    private void write(Values values) throws IOException {
-        Files.createDirectories(file.getParent());
-        var json=new JsonObject(); json.addProperty("openaiApiKey",values.apiKey.strip());
-        json.addProperty("soundsDirectory",values.soundsDirectory); json.addProperty("basePrompt",values.basePrompt);
-        json.addProperty("imagesDirectory",values.imagesDirectory);
-        json.addProperty("pauseCutThreshold",values.pauseCutThreshold);
-        json.addProperty("defaultVisualEffect",values.defaultVisualEffect);
-        json.addProperty("visualEffectStrength",values.visualEffectStrength);
-        json.addProperty("whisperModel",values.whisperModel);json.addProperty("whisperLanguage",values.whisperLanguage);
-        json.addProperty("whisperBeamSize",values.whisperBeamSize);json.addProperty("whisperCpuThreads",values.whisperCpuThreads);
-        json.addProperty("whisperVad",values.whisperVad);
-        json.addProperty("soundEffectPercent",values.soundEffectPercent);
-        json.addProperty("notifyTelegram",values.notifyTelegram);
-        json.addProperty("pythonExecutable",values.pythonExecutable);
-        json.addProperty("ffmpegExecutable",values.ffmpegExecutable);
-        json.addProperty("ffprobeExecutable",values.ffprobeExecutable);
-        json.addProperty("whisperScriptsDirectory",values.whisperScriptsDirectory);
-        json.addProperty("whisperModelsDirectory",values.whisperModelsDirectory);
+    void saveImagesDirectory(String directory) throws IOException {write(load().withImagesDirectory(normalizeImages(directory)));}
+    void saveNarrationLanguage(String language) throws IOException {write(load().withNarrationLanguage(validateNarrationLanguage(language)));}
+    private void write(Values v) throws IOException {
+        Files.createDirectories(file.getParent());var json=new JsonObject();json.addProperty("openaiApiKey",v.apiKey.strip());
+        json.addProperty("soundsDirectory",v.soundsDirectory);json.addProperty("imagesDirectory",v.imagesDirectory);json.addProperty("basePrompt",v.basePrompt);
+        json.addProperty("defaultVisualEffect",v.defaultVisualEffect);json.addProperty("visualEffectStrength",v.visualEffectStrength);
+        json.addProperty("narrationLanguage",v.narrationLanguage);json.addProperty("soundEffectPercent",v.soundEffectPercent);
+        json.addProperty("notifyTelegram",v.notifyTelegram);json.addProperty("ffmpegExecutable",v.ffmpegExecutable);json.addProperty("ffprobeExecutable",v.ffprobeExecutable);
         Path temp=Files.createTempFile(file.getParent(),".editor-settings-",".tmp");
         try {
-            try { Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------")); }
-            catch(UnsupportedOperationException ignored) { }
+            try {Files.setPosixFilePermissions(temp,PosixFilePermissions.fromString("rw-------"));} catch(UnsupportedOperationException ignored) {}
             Files.writeString(temp,new GsonBuilder().setPrettyPrinting().create().toJson(json)+"\n");
-            try { Files.move(temp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
-            catch(AtomicMoveNotSupportedException e) { Files.move(temp,file,StandardCopyOption.REPLACE_EXISTING); }
-        } finally { Files.deleteIfExists(temp); }
+            try {Files.move(temp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
+            catch(AtomicMoveNotSupportedException e) {Files.move(temp,file,StandardCopyOption.REPLACE_EXISTING);}
+        } finally {Files.deleteIfExists(temp);}
     }
     static Path validateSounds(String value) {
-        if(value.isBlank()) throw new IllegalArgumentException("Informe o diretório de sons.");
+        if(value.isBlank())throw new IllegalArgumentException("Informe o diretório de sons.");
         Path folder=Path.of(value.strip()).toAbsolutePath().normalize();
-        if(!Files.isDirectory(folder) || !Files.isReadable(folder)) throw new IllegalArgumentException("Escolha um diretório de sons existente e legível.");
+        if(!Files.isDirectory(folder)||!Files.isReadable(folder))throw new IllegalArgumentException("Escolha um diretório de sons existente e legível.");
         return folder;
     }
     static String normalizeImages(String value) {
-        if(value==null || value.isBlank())throw new IllegalArgumentException("Informe o diretório global de imagens.");
+        if(value==null||value.isBlank())throw new IllegalArgumentException("Informe o diretório global de imagens.");
         Path path=Path.of(value.strip()).toAbsolutePath().normalize();
-        if(Files.exists(path) && !Files.isDirectory(path))throw new IllegalArgumentException("O diretório de imagens não é uma pasta.");
+        if(Files.exists(path)&&!Files.isDirectory(path))throw new IllegalArgumentException("O diretório de imagens não é uma pasta.");
         return path.toString();
     }
-    static double parsePauseCutThreshold(String value) {
-        try { return validatePauseCutThreshold(Double.parseDouble(value.strip().replace(',', '.'))); }
-        catch(NumberFormatException e) { throw new IllegalArgumentException("Informe a pausa mínima em segundos (0,1 a 30)."); }
-    }
-    static double validatePauseCutThreshold(double value) {
-        if(!Double.isFinite(value) || value<.1 || value>30)
-            throw new IllegalArgumentException("A pausa mínima deve ficar entre 0,1 e 30 segundos.");
-        return value;
+    static String validateNarrationLanguage(String language) {
+        if(!Set.of("pt","en").contains(language))throw new IllegalArgumentException("Escolha português brasileiro ou inglês americano.");
+        return language;
     }
     static String validateVisualEffect(String value) {
-        if(!java.util.Set.of("none","smooth","particles","shake").contains(value))
-            throw new IllegalArgumentException("Escolha um efeito visual válido.");
+        if(!Set.of("none","smooth","particles","shake").contains(value))throw new IllegalArgumentException("Escolha um efeito visual válido.");
         return value;
     }
     static double parseVisualEffectStrength(String value) {
-        try { return VideoProject.validateVisualEffectStrength(Double.parseDouble(value.strip().replace(',','.'))); }
-        catch(NumberFormatException e) { throw new IllegalArgumentException("Informe intensidade visual entre 0,25 e 3."); }
-    }
-    static void validateWhisper(String model,String language,int beam,int threads) {
-        if(!java.util.Set.of("tiny","base","small","medium","large-v3").contains(model))
-            throw new IllegalArgumentException("Escolha um modelo Whisper válido.");
-        if(!java.util.Set.of("pt","en","auto").contains(language))
-            throw new IllegalArgumentException("Escolha português, inglês ou detecção automática de idioma.");
-        if(beam<1 || beam>10) throw new IllegalArgumentException("A busca do Whisper deve ficar entre 1 e 10.");
-        if(threads<1 || threads>16) throw new IllegalArgumentException("As threads do Whisper devem ficar entre 1 e 16.");
-    }
-    static int parseWhisperNumber(String value,String name,int min,int max) {
-        try { int number=Integer.parseInt(value.strip());if(number>=min&&number<=max)return number; }
-        catch(NumberFormatException ignored) { }
-        throw new IllegalArgumentException(name+" deve ficar entre "+min+" e "+max+".");
+        try {return VideoProject.validateVisualEffectStrength(Double.parseDouble(value.strip().replace(',','.')));}
+        catch(NumberFormatException e) {throw new IllegalArgumentException("Informe intensidade visual entre 0,25 e 3.");}
     }
     static int validateSoundEffectPercent(int value) {
-        if(!java.util.Set.of(0,25,50,75,100).contains(value))
-            throw new IllegalArgumentException("Escolha 0%, 25%, 50%, 75% ou 100% de efeitos sonoros.");
+        if(!Set.of(0,25,50,75,100).contains(value))throw new IllegalArgumentException("Escolha 0%, 25%, 50%, 75% ou 100% de efeitos sonoros.");
         return value;
     }
     static int parseSoundEffectPercent(String value) {
-        try { return validateSoundEffectPercent(Integer.parseInt(value.strip().split("%",2)[0].strip())); }
-        catch(NumberFormatException e) { throw new IllegalArgumentException("Escolha um percentual de efeitos sonoros válido."); }
+        try {return validateSoundEffectPercent(Integer.parseInt(value.strip().split("%",2)[0].strip()));}
+        catch(NumberFormatException e) {throw new IllegalArgumentException("Escolha um percentual de efeitos sonoros válido.");}
     }
     private static String value(JsonObject json,String name,String fallback) {
-        return json.has(name) && !json.get(name).isJsonNull() ? json.get(name).getAsString() : fallback;
+        return json.has(name)&&!json.get(name).isJsonNull()?json.get(name).getAsString():fallback;
     }
 }

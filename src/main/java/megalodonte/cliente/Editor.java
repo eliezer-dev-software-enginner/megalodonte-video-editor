@@ -48,15 +48,13 @@ public final class Editor extends ViewScript {
         if(generationBusy()) return;
         pausePlayback();
         if(settingsWindow!=null && settingsWindow.showing()) { settingsWindow.focus();return; }
-        try { var latest=settingsStore.load();settings=settings.withImagesDirectory(latest.imagesDirectory).withWhisperLanguage(latest.whisperLanguage); }
+        try { var latest=settingsStore.load();settings=settings.withImagesDirectory(latest.imagesDirectory).withNarrationLanguage(latest.narrationLanguage); }
         catch(java.io.IOException e) { message("Não foi possível ler a biblioteca global de imagens: "+e.getMessage());return; }
         settingsWindow=new SettingsWindow(owner(),new EditorSettings.Values(text("openaiKey"),settings.soundsDirectory,
-                settings.basePrompt,settings.pauseCutThreshold,settings.defaultVisualEffect,
+                settings.basePrompt,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
-                settings.whisperModel,settings.whisperLanguage,settings.whisperBeamSize,
-                settings.whisperCpuThreads,settings.whisperVad,settings.soundEffectPercent,
-                settings.pythonExecutable,settings.ffmpegExecutable,settings.ffprobeExecutable,
-                settings.whisperScriptsDirectory,settings.whisperModelsDirectory,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
+                settings.narrationLanguage,settings.soundEffectPercent,
+                settings.ffmpegExecutable,settings.ffprobeExecutable,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
             project.avatarDirectory=avatarDirectory;
             if(!project.clips.isEmpty()) {
@@ -130,68 +128,56 @@ public final class Editor extends ViewScript {
     public void cancelImages() { if(imageJob!=null) { logJob("Imagens","Cancelamento solicitado.");imageJob.cancel();if(imageThread!=null) imageThread.interrupt();set("iaStatus","Cancelando geração…"); } }
     private boolean generationBusy() {
         if(motionEffectApplying) { message("Aguarde a aplicação do efeito visual terminar antes de alterar o projeto.");return true; }
-        if(whisperThread!=null) { message("Aguarde a sincronização com o Whisper terminar antes de alterar o projeto."); return true; }
+        if(whisperThread!=null) { message("Aguarde a sincronização da narração terminar antes de alterar o projeto.");return true; }
         if(imageJob==null) return false;
         message("Aguarde ou cancele a geração de imagens antes de alterar o projeto.");return true;
     }
 
     public void syncNarration() {
         if(generationBusy()) return;
-        try { settings=settings.withWhisperLanguage(settingsStore.load().whisperLanguage); }
-        catch(java.io.IOException e) { message("Não foi possível ler o idioma da narração: "+e.getMessage());return; }
-        if(project.narration.file.isBlank()) { message("Anexe uma narração antes de sincronizar."); return; }
-        if(project.clips.isEmpty()) { message("Crie as cenas do roteiro antes de sincronizar."); return; }
-        if(projectFile==null) { message("Salve o projeto antes de sincronizar a narração."); return; }
+        if(project.narration.file.isBlank()) { message("Anexe uma narração antes de sincronizar.");return; }
+        if(project.clips.isEmpty()) { message("Crie as cenas do roteiro antes de anexar a narração.");return; }
+        if(projectFile==null) { saveProject();if(projectFile==null) { message("Salve o projeto para sincronizar a narração.");return; } }
         try {
-            project.script=text("roteiro");
-            project.save(projectFile,projectRevision);
+            settings=settings.withNarrationLanguage(settingsStore.load().narrationLanguage);
+            project.script=text("roteiro");project.save(projectFile,projectRevision);
             projectRevision=VideoProject.revision(projectFile);savedProject=project.snapshot();
-            pausePlayback();
-            whisperSync=new WhisperSync(projectFile,settings);
-        } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage()); return; }
+            pausePlayback();whisperSync=new WhisperSync(projectFile,settings);
+        } catch(Exception e) { message("Não foi possível preparar a sincronização: "+e.getMessage());return; }
         var sync=whisperSync;var targetProject=project;var targetFile=projectFile;
-        final boolean notifyOnCompletion=settings.notifyTelegram;
+        set("whisperDisabled",true);set("whisperStatus","Sincronizando narração automaticamente…");
         logJob("Whisper","Iniciando sincronização de "+targetFile.getFileName()+".");
-        whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()-> {
-            String outcome; boolean success=false;boolean cancelled=false;
+        whisperThread=Thread.ofPlatform().daemon(true).name("local-whisper-sync").start(()->{
+            String outcome;boolean success=false;
             try {
-                javafx.application.Platform.runLater(()->set("whisperStatus","Carregando Whisper local…"));
-                sync.run(line-> { logJob("Whisper",line); javafx.application.Platform.runLater(()-> {
-                    if(!disposed && whisperSync==sync) set("whisperStatus",line);
-                }); });
-                var report=new com.google.gson.JsonParser().parseString(Files.readString(targetFile.getParent().resolve("sincronizacao/alinhamento.json"))).getAsJsonObject();
-                long partial=report.getAsJsonArray("scenes").asList().stream().filter(scene->scene.getAsJsonObject().get("partial").getAsBoolean()).count();
-                double leading=report.get("leadingSilence").getAsDouble();
-                double trailing=report.get("trailingSilence").getAsDouble();
+                sync.run(line->{logJob("Whisper",line);javafx.application.Platform.runLater(()->{
+                    if(!disposed && whisperSync==sync)set("whisperStatus",line);
+                });});
+                var report=com.google.gson.JsonParser.parseString(Files.readString(targetFile.getParent().resolve("sincronizacao/alinhamento.json"))).getAsJsonObject();
                 success=true;
-                outcome="Narração sincronizada com Whisper: "+report.getAsJsonArray("scenes").size()+" cenas, "+String.format(Locale.forLanguageTag("pt-BR"),"%.1f%%",report.get("coverage").getAsDouble()*100)+" de correspondência."+
-                        (partial>0 ? " "+partial+" cena(s) tinham fala encurtada e foram ajustadas pela transição seguinte." : "")+
-                        ((leading>=1 || trailing>=1) ? " Atenção: a narração contém "+
-                                String.format(Locale.forLanguageTag("pt-BR"),"%.1fs antes da primeira fala e %.1fs após a última",leading,trailing)+
-                                "; corte esses silêncios e sincronize novamente se não forem intencionais." : "");
-            } catch(InterruptedException e) { Thread.currentThread().interrupt();outcome="Sincronização cancelada. Nenhuma duração foi aplicada.";cancelled=true; }
-            catch(Exception e) { cancelled=sync.cancelled();outcome=cancelled ? "Sincronização cancelada. Nenhuma duração foi aplicada." : "Não foi possível sincronizar: "+e.getMessage(); }
+                outcome="Narração sincronizada automaticamente: "+report.getAsJsonArray("scenes").size()+" cenas, "+
+                        String.format(Locale.forLanguageTag("pt-BR"),"%.1f%%",report.get("coverage").getAsDouble()*100)+" de correspondência. Confira os cortes na prévia.";
+            } catch(InterruptedException e) {Thread.currentThread().interrupt();outcome="Sincronização cancelada.";}
+            catch(Exception e) {outcome=sync.cancelled()?"Sincronização cancelada.":"Não foi possível sincronizar automaticamente: "+e.getMessage();}
             logJob("Whisper",outcome);
-            if(!cancelled && !sync.cancelled()) outcome=notifyJob("Whisper",outcome,
-                    "Sincronização com Whisper — "+targetFile.getFileName()+": "+outcome,notifyOnCompletion);
             final String result=outcome;final boolean applied=success;
-            javafx.application.Platform.runLater(()-> {
+            javafx.application.Platform.runLater(()->{
                 if(disposed || whisperSync!=sync)return;
                 whisperThread=null;whisperSync=null;
                 if(applied && project==targetProject && Objects.equals(projectFile,targetFile)) {
-                    try { applyProject(VideoProject.load(targetFile),targetFile); }
-                    catch(Exception e) { set("whisperStatus","Sincronização gravada, mas não foi possível recarregar: "+e.getMessage());message((String)get("whisperStatus"));return; }
+                    try {applyProject(VideoProject.load(targetFile),targetFile);}
+                    catch(Exception e) {set("whisperStatus","Sincronização salva, mas não foi possível recarregar: "+e.getMessage());message((String)get("whisperStatus"));return;}
                 }
                 set("whisperDisabled",project.narration.file.isBlank());set("whisperStatus",result);message(result);
             });
         });
-        set("whisperDisabled",true);set("whisperStatus","Preparando sincronização local…");
     }
 
     @Override public void onDestroy() {
         if(settingsWindow!=null) settingsWindow.close();
         disposed = true; if(imageJob!=null) imageJob.cancel();if(imageThread!=null) imageThread.interrupt();
-        if(whisperSync!=null) whisperSync.cancel();if(whisperThread!=null) whisperThread.interrupt();if (playback != null) playback.stop(); playing = false;
+        if(whisperSync!=null)whisperSync.cancel();if(whisperThread!=null)whisperThread.interrupt();
+        if (playback != null) playback.stop(); playing = false;
         if(motionEffectListener!=null) state("motionEffect",String.class).unsubscribe(motionEffectListener);
         if(scriptListener!=null) state("roteiro",String.class).unsubscribe(scriptListener);
         audio.close(); if (exporter != null) exporter.cancel(); if (exportThread != null) exportThread.interrupt();
@@ -254,7 +240,7 @@ public final class Editor extends ViewScript {
         pausePlayback();int i=(Integer)get("efeitoSelecionado");project.effects.remove(i);set("efeitoSelecionado",Math.min(i,project.effects.size()-1));
         refreshEffects();audio.load(project,this::audioError);message("Efeito removido.");
     }
-    public void attachNarration() { if(generationBusy()) return; attachAudio(project.narration); }
+    public void attachNarration() { if(generationBusy()) return; if(attachAudio(project.narration))syncNarration(); }
     public void attachMusic() { if(generationBusy()) return; attachAudio(project.music); }
     public void applySounds() {
         if(generationBusy()) return;
@@ -283,14 +269,15 @@ public final class Editor extends ViewScript {
             String status="Não foi possível aplicar os sons: "+e.getMessage();set("soundStatus",status);message(status);
         }
     }
-    private void attachAudio(VideoProject.AudioTrack track) {
-        if (!readVolumes()) return;
+    private boolean attachAudio(VideoProject.AudioTrack track) {
+        if (!readVolumes()) return false;
         var kind=track==project.narration ? FileDialogs.Kind.NARRATION : FileDialogs.Kind.MUSIC;
-        var files=chooseFiles(kind); if(files.isEmpty()) return;
+        var files=chooseFiles(kind); if(files.isEmpty()) return false;
         java.io.File file=files.getFirst().toFile();
         pausePlayback(); track.file = file.getAbsolutePath(); refreshAudio(); audio.load(project,this::audioError);
         if(projectFile!=null) saveProject();
         else message("Áudio anexado. Salve o projeto para preservar o arquivo de narração.");
+        return true;
     }
     public void removeNarration() { if(generationBusy()) return; pausePlayback(); project.narration.file=""; refreshAudio(); audio.load(project,this::audioError); }
     public void removeMusic() { if(generationBusy()) return; pausePlayback(); project.music.file=""; refreshAudio(); audio.load(project,this::audioError); }

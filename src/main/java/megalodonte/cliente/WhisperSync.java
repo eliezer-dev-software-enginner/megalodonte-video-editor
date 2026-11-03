@@ -27,18 +27,16 @@ final class WhisperSync {
 
     WhisperSync(Path project,EditorSettings.Values settings) throws IOException {
         this.project = project.toAbsolutePath().normalize();
-        this.pauseCutThreshold=EditorSettings.validatePauseCutThreshold(settings.pauseCutThreshold);
-        EditorSettings.validateWhisper(settings.whisperModel,settings.whisperLanguage,
-                settings.whisperBeamSize,settings.whisperCpuThreads);
-        this.model=settings.whisperModel;this.language=settings.whisperLanguage;
-        this.beamSize=settings.whisperBeamSize;this.cpuThreads=settings.whisperCpuThreads;this.vad=settings.whisperVad;
-        this.scriptsRoot = settings.whisperScriptsDirectory.isBlank() ? findScriptsRoot() : Path.of(settings.whisperScriptsDirectory);
+        this.pauseCutThreshold=1.0;
+        this.model="small";this.language=settings.narrationLanguage;
+        this.beamSize=5;this.cpuThreads=4;this.vad=true;
+        this.scriptsRoot = findScriptsRoot();
         if(!Files.isRegularFile(scriptsRoot.resolve("tools/transcribe_narration.py")) ||
                 !Files.isRegularFile(scriptsRoot.resolve("tools/sync_narration.py")))
             throw new IOException("A pasta configurada não contém os scripts do Whisper.");
-        this.python = settings.pythonExecutable.isBlank() ? findPython(scriptsRoot) : Path.of(settings.pythonExecutable);
+        this.python = findPython(scriptsRoot);
         this.ffprobe=ExternalTools.command(settings.ffprobeExecutable,"ffprobe");
-        this.modelsDirectory=settings.whisperModelsDirectory;
+        this.modelsDirectory="";
     }
 
     void run(Consumer<String> progress) throws IOException, InterruptedException {

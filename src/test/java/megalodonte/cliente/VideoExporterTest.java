@@ -39,8 +39,17 @@ class VideoExporterTest {
         project.narration.file=wave("longa.wav",220,.2,3).toString();
         var output=directory.resolve("existing.mp4");Files.writeString(output,"original");
         var error=assertThrows(IOException.class,()->new VideoExporter(320,180).export(project,output,m->{}));
-        assertTrue(error.getMessage().contains("Sincronize com Whisper"));
+        assertTrue(error.getMessage().contains("Repita a sincronização da narração"));
         assertEquals("original",Files.readString(output));
+    }
+    @Test void roundsCumulativeSceneBoundariesInExport() throws Exception {
+        var project=VideoProject.fromScript("Um\n\nDois\n\nTrês\n\nQuatro");
+        var still=image("timing.png",Color.BLUE);
+        project.clips.forEach(clip->{clip.image=still.toString();clip.duration=.114;});
+        var output=directory.resolve("timing.mp4");
+        new VideoExporter(320,180).export(project,output,m->{});
+        var frames=textCommand("ffprobe","-v","error","-count_frames","-select_streams","v:0","-show_entries","stream=nb_read_frames","-of","csv=p=0",output.toString()).strip();
+        assertEquals("14",frames);
     }
     @Test void configuredFfprobeIsUsedForNarrationCheck() throws Exception {
         var probe=directory.resolve("custom-ffprobe");

@@ -24,24 +24,18 @@ final class SettingsWindow implements AutoCloseable {
                     view.states().string("soundsDirectory").get().isBlank() ? "" :
                             EditorSettings.validateSounds(view.states().string("soundsDirectory").get()).toString(),
                     view.states().string("basePrompt").get(),
-                    EditorSettings.parsePauseCutThreshold(view.states().string("pauseCutThreshold").get()),
                     EditorSettings.validateVisualEffect(view.states().string("defaultVisualEffect").get()),
                     EditorSettings.parseVisualEffectStrength(view.states().string("visualEffectStrength").get()),
-                    view.states().string("whisperModel").get(),view.states().string("whisperLanguage").get(),
-                    EditorSettings.parseWhisperNumber(view.states().string("whisperBeamSize").get(),"A busca do Whisper",1,10),
-                    EditorSettings.parseWhisperNumber(view.states().string("whisperCpuThreads").get(),"As threads do Whisper",1,16),
-                    Boolean.parseBoolean(view.states().string("whisperVad").get()),
+                    EditorSettings.validateNarrationLanguage(view.states().string("narrationLanguage").get()),
                     EditorSettings.parseSoundEffectPercent(view.states().string("soundEffectPercent").get()),
-                        view.states().string("pythonExecutable").get(),view.states().string("ffmpegExecutable").get(),
-                        view.states().string("ffprobeExecutable").get(),view.states().string("whisperScriptsDirectory").get(),
-                        view.states().string("whisperModelsDirectory").get(),notifyTelegram.isSelected(),EditorSettings.normalizeImages(view.states().string("imagesDirectory").get()));
+                    view.states().string("ffmpegExecutable").get(),view.states().string("ffprobeExecutable").get(),
+                    notifyTelegram.isSelected(),EditorSettings.normalizeImages(view.states().string("imagesDirectory").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
                 apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
         }).register("cancelSettings",view -> stage.close())
           .register("showGeneral",view -> showSection(view,"General"))
           .register("showVisual",view -> showSection(view,"Visual"))
-          .register("showWhisper",view -> showSection(view,"Whisper"))
           .register("showTools",view -> showSection(view,"Tools"))
           .register("showAvatar",view -> showSection(view,"Avatar"))
           .register("showPrompt",view -> showSection(view,"Prompt"))
@@ -70,23 +64,14 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
         session.states().set("imagesDirectory",values.imagesDirectory);
         session.states().set("avatarDirectory",avatarDirectory);
-        session.states().set("pythonExecutable",values.pythonExecutable);
         session.states().set("ffmpegExecutable",values.ffmpegExecutable);
         session.states().set("ffprobeExecutable",values.ffprobeExecutable);
-        session.states().set("whisperScriptsDirectory",values.whisperScriptsDirectory);
-        session.states().set("whisperModelsDirectory",values.whisperModelsDirectory);
         session.states().set("basePrompt",values.basePrompt);
-        session.states().set("pauseCutThreshold",Double.toString(values.pauseCutThreshold));
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
         session.states().set("defaultVisualEffect",values.defaultVisualEffect);
         session.states().set("visualEffectStrength",Double.toString(values.visualEffectStrength));
-        session.states().set("whisperModelOptions","[{\"value\":\"tiny\",\"label\":\"Tiny (rápido)\"},{\"value\":\"base\",\"label\":\"Base\"},{\"value\":\"small\",\"label\":\"Small (padrão)\"},{\"value\":\"medium\",\"label\":\"Medium\"},{\"value\":\"large-v3\",\"label\":\"Large v3 (mais pesado)\"}]");
-        session.states().set("whisperLanguageOptions","[{\"value\":\"pt\",\"label\":\"Português brasileiro\"},{\"value\":\"en\",\"label\":\"Inglês americano\"},{\"value\":\"auto\",\"label\":\"Detectar automaticamente\"}]");
-        session.states().set("whisperVadOptions","[{\"value\":\"true\",\"label\":\"Ligado\"},{\"value\":\"false\",\"label\":\"Desligado\"}]");
-        session.states().set("whisperModel",values.whisperModel);session.states().set("whisperLanguage",values.whisperLanguage);
-        session.states().set("whisperBeamSize",Integer.toString(values.whisperBeamSize));
-        session.states().set("whisperCpuThreads",Integer.toString(values.whisperCpuThreads));
-        session.states().set("whisperVad",Boolean.toString(values.whisperVad));
+        session.states().set("narrationLanguageOptions","[{\"value\":\"pt\",\"label\":\"Português brasileiro\"},{\"value\":\"en\",\"label\":\"Inglês americano\"}]");
+        session.states().set("narrationLanguage",values.narrationLanguage);
         session.states().set("soundEffectPercentOptions","[\"0% de efeitos sonoros\",\"25% de efeitos sonoros\",\"50% de efeitos sonoros\",\"75% de efeitos sonoros\",\"100% de efeitos sonoros\"]");
         session.states().set("soundEffectPercent",values.soundEffectPercent+"% de efeitos sonoros");
         var root=(Parent)session.render().getJavaFxNode();
@@ -98,7 +83,7 @@ final class SettingsWindow implements AutoCloseable {
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
     }
     private static void showSection(UiSession view,String selected) {
-        for(String section: new String[]{"General","Visual","Whisper","Tools","Avatar","Prompt"}) {
+        for(String section: new String[]{"General","Visual","Tools","Avatar","Prompt"}) {
             boolean active=section.equals(selected);
             view.states().set("show"+section,active);
             var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();

@@ -51,7 +51,7 @@ public final class VideoCli {
             if(!options.containsKey("--dry-run") && !library.equals(settings.imagesDirectory)) {
                 new EditorSettings().saveImagesDirectory(library);settings=settings.withImagesDirectory(library);
             }
-            String language=narrationLanguage(value("--language","Idioma da narração: pt-BR ou en-US",settings.whisperLanguage.equals("en")?"en-US":"pt-BR"));
+            String language=narrationLanguage(value("--language","Idioma da narração: pt-BR ou en-US",settings.narrationLanguage.equals("en")?"en-US":"pt-BR"));
             String defaultEffect="smooth";
             String effect=value("--effect","Efeito visual: none, smooth, particles ou shake",defaultEffect).toLowerCase(Locale.ROOT);
             if(effect.equals("none")) effect="";
@@ -79,8 +79,8 @@ public final class VideoCli {
                 System.out.println("Validação concluída. Nenhum áudio, imagem ou vídeo foi gerado.");
                 return;
             }
-            if(!language.equals(settings.whisperLanguage)) {
-                new EditorSettings().saveNarrationLanguage(language);settings=settings.withWhisperLanguage(language);
+            if(!language.equals(settings.narrationLanguage)) {
+                new EditorSettings().saveNarrationLanguage(language);settings=settings.withNarrationLanguage(language);
             }
             if(imageDirectory==null) {
                 String key=settings.apiKey.isBlank()?System.getenv().getOrDefault("OPENAI_API_KEY",""):settings.apiKey;

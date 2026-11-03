@@ -845,27 +845,20 @@
                     ]
                   },
                   {
+                    "type": "Text",
+                    "props": { "text": "Ao anexar uma narração, as cenas são sincronizadas automaticamente. Confira o resultado na prévia.", "wrapWidth": 450 }
+                  },
+                  {
                     "type": "Button",
-                    "props": {
-                      "text": "Sincronizar com whisper",
-                      "height": 36
-                    },
-                    "events": {
-                      "onClick": "syncNarration"
-                    },
+                    "props": { "text": "Repetir sincronização", "height": 36 },
+                    "events": { "onClick": "syncNarration" },
                     "id": "syncNarrationButton",
-                    "bind": {
-                      "disabled": "whisperDisabled"
-                    }
+                    "bind": { "disabled": "whisperDisabled" }
                   },
                   {
                     "type": "Text",
-                    "props": {
-                      "wrapWidth": 450
-                    },
-                    "bind": {
-                      "text": "whisperStatus"
-                    }
+                    "props": { "wrapWidth": 450 },
+                    "bind": { "text": "whisperStatus" }
                   },
                   {
                     "type": "Text",

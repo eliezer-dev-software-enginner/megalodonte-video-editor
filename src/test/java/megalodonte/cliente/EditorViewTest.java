@@ -50,12 +50,10 @@ class EditorViewTest {
                 var keyField=(PasswordField)settingsRoot.lookup(".password-field");
                 var folderField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Diretório de sons e efeitos".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var imagesField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "Pasta compartilhada de imagens geradas".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
-                var pauseField=settingsRoot.lookupAll(".text-field").stream().filter(n->n instanceof TextField field && "1,0".equals(field.getPromptText())).map(n->(TextField)n).findFirst().orElseThrow();
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
-                assertEquals("1.0",pauseField.getText());
                 assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
-                for(String section:new String[]{"Efeitos visuais","Whisper","Ferramentas","Avatar","Prompt base","Geral"}) {
+                for(String section:new String[]{"Efeitos visuais","Ferramentas","Avatar","Prompt base","Geral"}) {
                     var navigation=settingsRoot.lookupAll(".button").stream()
                         .filter(n->n instanceof Button b && b.getText().equals(section)).map(n->(Button)n).findFirst().orElseThrow();
                     navigation.fire();
@@ -69,7 +67,7 @@ class EditorViewTest {
                     .map(n->(ComboBox<String>)n).findFirst().orElseThrow();
                 assertEquals("100% de efeitos sonoros",effectCoverage.getValue());
                 var narrationLanguage=settingsRoot.lookupAll(".combo-box").stream()
-                    .filter(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en","auto")))
+                    .filter(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en")))
                     .map(n->(ComboBox<String>)n).findFirst().orElseThrow();
                 narrationLanguage.setValue("en");
                 var imagesFolder=Files.createTempDirectory("editor-images-");imagesField.setText(imagesFolder.toString());
@@ -79,15 +77,12 @@ class EditorViewTest {
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
                 saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
                 var soundsFolder=Files.createTempDirectory("editor-sounds-");folderField.setText(soundsFolder.toString());
-                pauseField.setText("31");saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
-                pauseField.setText("1,7");
                 var settingsShot=settingsRoot.snapshot(null,null);var settingsPng=new BufferedImage((int)settingsShot.getWidth(),(int)settingsShot.getHeight(),BufferedImage.TYPE_INT_ARGB);
                 for(int y=0;y<settingsPng.getHeight();y++)for(int x=0;x<settingsPng.getWidth();x++)settingsPng.setRGB(x,y,settingsShot.getPixelReader().getArgb(x,y));
                 Files.createDirectories(Path.of("build/preview"));ImageIO.write(settingsPng,"png",Path.of("build/preview/settings-window.png").toFile());
                 saveSettings.fire();assertFalse(settingsStage.isShowing());assertEquals("dummy-settings-key",session.states().get("openaiKey"));
                 var persisted=new EditorSettings().load();assertEquals(soundsFolder.toString(),persisted.soundsDirectory);assertEquals("Prompt editado e salvo",persisted.basePrompt);
-                assertEquals(imagesFolder.toString(),persisted.imagesDirectory);assertEquals("en",persisted.whisperLanguage);
-                assertEquals(1.7,persisted.pauseCutThreshold);
+                assertEquals(imagesFolder.toString(),persisted.imagesDirectory);assertEquals("en",persisted.narrationLanguage);
                 assertEquals(50,persisted.soundEffectPercent);
                 try(var restarted=new ScriptApplication(AppConfig.load(Editor.class.getClassLoader()),Editor.class.getClassLoader())) {
                     restarted.render();restarted.onMount();assertEquals("dummy-settings-key",restarted.current().states().get("openaiKey"));
@@ -96,7 +91,7 @@ class EditorViewTest {
                 var reopened=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream().filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
                 reopened.getScene().getRoot().applyCss();
                 assertTrue(reopened.getScene().getRoot().lookupAll(".text-field").stream().anyMatch(n->n instanceof TextField field && "Pasta compartilhada de imagens geradas".equals(field.getPromptText()) && imagesFolder.toString().equals(field.getText())));
-                assertTrue(reopened.getScene().getRoot().lookupAll(".combo-box").stream().anyMatch(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en","auto")) && "en".equals(box.getValue())));
+                assertTrue(reopened.getScene().getRoot().lookupAll(".combo-box").stream().anyMatch(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en")) && "en".equals(box.getValue())));
                 ((TextArea)reopened.getScene().getRoot().lookup(".text-area")).setText("Não salvar");reopened.close();
                 assertEquals("Prompt editado e salvo",new EditorSettings().load().basePrompt);
                 Files.delete(Path.of(System.getProperty("megalodonte.editor.settingsDir"),"editor-settings.json"));session.states().set("openaiKey","");
@@ -105,8 +100,7 @@ class EditorViewTest {
                 session.states().set("volumeMusica","15"); session.states().set("volumeNarracao","80"); session.invoke("applyVolumes");
                 assertTrue(session.states().string("mensagem").get().contains("Volumes aplicados"));
                 assertEquals("Exportar vídeo",((Button)session.component("exportButton").getJavaFxNode()).getText());
-                assertEquals("Sincronizar com whisper",((Button)session.component("syncNarrationButton").getJavaFxNode()).getText());
-                assertTrue(session.component("syncNarrationButton").getJavaFxNode().isDisabled());
+                assertEquals("Repetir sincronização",((Button)session.component("syncNarrationButton").getJavaFxNode()).getText());
                 assertTrue(((Button)session.component("cancelExportButton").getJavaFxNode()).isVisible()==false);
                 var area = (TextArea) session.component("scriptInput").getJavaFxNode();
                 ((Button) session.component("createScenes").getJavaFxNode()).fire(); assertTrue(session.states().string("mensagem").get().contains("obrigatório"));

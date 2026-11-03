@@ -18,10 +18,6 @@
       "type": "string",
       "initial": ""
     },
-    "pauseCutThreshold": {
-      "type": "string",
-      "initial": "1.0"
-    },
     "defaultVisualEffect": {
       "type": "string",
       "initial": "none"
@@ -34,38 +30,6 @@
       "type": "string",
       "initial": "1.0"
     },
-    "whisperModel": {
-      "type": "string",
-      "initial": "small"
-    },
-    "whisperModelOptions": {
-      "type": "string",
-      "initial": "[]"
-    },
-    "whisperLanguage": {
-      "type": "string",
-      "initial": "pt"
-    },
-    "whisperLanguageOptions": {
-      "type": "string",
-      "initial": "[]"
-    },
-    "whisperBeamSize": {
-      "type": "string",
-      "initial": "5"
-    },
-    "whisperCpuThreads": {
-      "type": "string",
-      "initial": "4"
-    },
-    "whisperVad": {
-      "type": "string",
-      "initial": "true"
-    },
-    "whisperVadOptions": {
-      "type": "string",
-      "initial": "[]"
-    },
     "mensagem": {
       "type": "string",
       "initial": ""
@@ -75,10 +39,6 @@
       "initial": true
     },
     "showVisual": {
-      "type": "boolean",
-      "initial": false
-    },
-    "showWhisper": {
       "type": "boolean",
       "initial": false
     },
@@ -102,10 +62,6 @@
       "type": "string",
       "initial": ""
     },
-    "pythonExecutable": {
-      "type": "string",
-      "initial": ""
-    },
     "ffmpegExecutable": {
       "type": "string",
       "initial": ""
@@ -114,17 +70,17 @@
       "type": "string",
       "initial": ""
     },
-    "whisperScriptsDirectory": {
-      "type": "string",
-      "initial": ""
-    },
-    "whisperModelsDirectory": {
-      "type": "string",
-      "initial": ""
-    },
     "showTools": {
       "type": "boolean",
       "initial": false
+    },
+    "narrationLanguage": {
+      "type": "string",
+      "initial": "pt"
+    },
+    "narrationLanguageOptions": {
+      "type": "string",
+      "initial": "[]"
     }
   },
   "view": {
@@ -187,17 +143,6 @@
                 },
                 "events": {
                   "onClick": "showVisual"
-                }
-              },
-              {
-                "type": "Button",
-                "id": "settingsNavWhisper",
-                "props": {
-                  "text": "Whisper",
-                  "height": 40
-                },
-                "events": {
-                  "onClick": "showWhisper"
                 }
               },
               {
@@ -306,20 +251,39 @@
                       },
                       {
                         "type": "Text",
-                        "props": { "text": "Biblioteca global de imagens" }
+                        "props": {
+                          "text": "Biblioteca global de imagens"
+                        }
                       },
                       {
-                        "type": "Input", "id": "imagesDirectoryInput",
-                        "props": { "height": 36, "width": 530, "placeholder": "Pasta compartilhada de imagens geradas" },
-                        "bind": { "value": "imagesDirectory" }
+                        "type": "Input",
+                        "id": "imagesDirectoryInput",
+                        "props": {
+                          "height": 36,
+                          "width": 530,
+                          "placeholder": "Pasta compartilhada de imagens geradas"
+                        },
+                        "bind": {
+                          "value": "imagesDirectory"
+                        }
                       },
                       {
-                        "type": "Button", "id": "chooseImagesButton",
-                        "props": { "text": "Selecionar pasta de imagens…", "height": 36 },
-                        "events": { "onClick": "chooseImages" }
+                        "type": "Button",
+                        "id": "chooseImagesButton",
+                        "props": {
+                          "text": "Selecionar pasta de imagens…",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "chooseImages"
+                        }
                       },
                       {
-                        "type": "Text", "props": { "text": "Imagens geradas ficam nesta biblioteca e podem ser reutilizadas em outros projetos.", "wrapWidth": 520 }
+                        "type": "Text",
+                        "props": {
+                          "text": "Imagens geradas ficam nesta biblioteca e podem ser reutilizadas em outros projetos.",
+                          "wrapWidth": 520
+                        }
                       },
                       {
                         "type": "Text",
@@ -378,6 +342,31 @@
                         "type": "Text",
                         "props": {
                           "text": "Percentual máximo de cenas que receberão efeitos ao clicar em Aplicar sons. A música de fundo é independente.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Idioma da narração no CLI"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "narrationLanguageInput",
+                        "props": {
+                          "width": 260,
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "narrationLanguage",
+                          "items": "narrationLanguageOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Use o roteiro no idioma escolhido. No Ressoa, o sotaque depende da voz e do motor.",
                           "wrapWidth": 520
                         }
                       }
@@ -457,170 +446,6 @@
                   },
                   {
                     "type": "Column",
-                    "id": "settingsWhisperPanel",
-                    "props": {
-                      "spacing": 12,
-                      "fillWidth": true
-                    },
-                    "bind": {
-                      "visible": "showWhisper"
-                    },
-                    "children": [
-                      {
-                        "type": "Text",
-                        "style": {
-                          "fontSize": 20
-                        },
-                        "props": {
-                          "text": "Whisper e sincronização"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Ajuste a transcrição local da narração.",
-                          "wrapWidth": 520
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "style": {
-                          "fontSize": 18
-                        },
-                        "props": {
-                          "text": "Transcrição local com Whisper"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Modelo"
-                        }
-                      },
-                      {
-                        "type": "Select",
-                        "id": "whisperModelInput",
-                        "props": {
-                          "width": 260,
-                          "height": 36
-                        },
-                        "bind": {
-                          "value": "whisperModel",
-                          "items": "whisperModelOptions"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Idioma da narração para sincronização e para novas narrações no CLI"
-                        }
-                      },
-                      {
-                        "type": "Select",
-                        "id": "whisperLanguageInput",
-                        "props": {
-                          "width": 260,
-                          "height": 36
-                        },
-                        "bind": {
-                          "value": "whisperLanguage",
-                          "items": "whisperLanguageOptions"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": { "text": "Use o roteiro no idioma escolhido. No Ressoa, o sotaque depende da voz e do motor.", "wrapWidth": 520 }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Busca (1 a 10 hipóteses)"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "whisperBeamSizeInput",
-                        "props": {
-                          "width": 150,
-                          "height": 36,
-                          "placeholder": "5"
-                        },
-                        "bind": {
-                          "value": "whisperBeamSize"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Threads de CPU (1 a 16)"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "whisperCpuThreadsInput",
-                        "props": {
-                          "width": 150,
-                          "height": 36,
-                          "placeholder": "4"
-                        },
-                        "bind": {
-                          "value": "whisperCpuThreads"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Filtro de silêncio (VAD)"
-                        }
-                      },
-                      {
-                        "type": "Select",
-                        "id": "whisperVadInput",
-                        "props": {
-                          "width": 200,
-                          "height": 36
-                        },
-                        "bind": {
-                          "value": "whisperVad",
-                          "items": "whisperVadOptions"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Modelos maiores podem exigir mais memória e download na primeira execução.",
-                          "wrapWidth": 520
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Pausa mínima para trocar de cena após a fala (segundos)"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "pauseCutThresholdInput",
-                        "props": {
-                          "height": 36,
-                          "width": 150,
-                          "placeholder": "1,0"
-                        },
-                        "bind": {
-                          "value": "pauseCutThreshold"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Pausas menores mantêm o corte no meio do intervalo. Não cria cenas: o roteiro precisa indicar a transição.",
-                          "wrapWidth": 520
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "type": "Column",
                     "id": "settingsToolsPanel",
                     "props": {
                       "spacing": 12,
@@ -644,24 +469,6 @@
                         "props": {
                           "text": "Deixe um campo vazio para detectar automaticamente. Caminhos específicos permitem usar outras instalações no seu computador.",
                           "wrapWidth": 520
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Python para Whisper"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "pythonExecutableInput",
-                        "props": {
-                          "height": 36,
-                          "width": 530,
-                          "placeholder": "Ex.: /caminho/venv/bin/python"
-                        },
-                        "bind": {
-                          "value": "pythonExecutable"
                         }
                       },
                       {
@@ -698,42 +505,6 @@
                         },
                         "bind": {
                           "value": "ffprobeExecutable"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Pasta do aplicativo que contém tools/"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "whisperScriptsDirectoryInput",
-                        "props": {
-                          "height": 36,
-                          "width": 530,
-                          "placeholder": "Automático: pasta do editor"
-                        },
-                        "bind": {
-                          "value": "whisperScriptsDirectory"
-                        }
-                      },
-                      {
-                        "type": "Text",
-                        "props": {
-                          "text": "Cache dos modelos Whisper"
-                        }
-                      },
-                      {
-                        "type": "Input",
-                        "id": "whisperModelsDirectoryInput",
-                        "props": {
-                          "height": 36,
-                          "width": 530,
-                          "placeholder": "Automático: .local-asr/models"
-                        },
-                        "bind": {
-                          "value": "whisperModelsDirectory"
                         }
                       }
                     ]

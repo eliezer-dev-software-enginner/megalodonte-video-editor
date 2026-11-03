@@ -2,7 +2,7 @@
 
 ## Navegação das Configurações
 
-A janela de Configurações usa uma barra lateral com Geral, Efeitos visuais, Whisper e Prompt base. A seção ativa aparece no painel à direita; as demais ficam ocultas e não ocupam espaço. Os estados dos campos continuam vivos durante a navegação e o botão Salvar configurações grava tudo de uma vez. A estrutura e os controles permanecem declarados em `settings.view.jsonc`.
+A janela de Configurações usa uma barra lateral com Geral, Efeitos visuais, Ferramentas, Avatar e Prompt base. A seção ativa aparece no painel à direita; as demais ficam ocultas e não ocupam espaço. Os estados dos campos continuam vivos durante a navegação e o botão Salvar configurações grava tudo de uma vez. A estrutura e os controles permanecem declarados em `settings.view.jsonc`.
 
 Na seção Geral, **Cobertura de efeitos sonoros** permite 0%, 25%, 50%, 75% ou 100% das cenas. O botão **Aplicar sons** prioriza as combinações cena/arquivo com maior relevância de tags e limita a quantidade de cenas com efeitos ao teto desse percentual; cenas que já têm efeitos não são apagadas ao reduzir a preferência. A música de fundo é selecionada independentemente desse limite. Preferências antigas usam 100%, reproduzindo a cobertura anterior.
 
@@ -14,9 +14,9 @@ Na prévia, `AudioPreview` prepara apenas efeitos próximos da posição de repr
 
 As Configurações guardam o efeito padrão para novas cenas (`none`, `smooth`, `particles` ou `shake`) e a intensidade visual entre 0,25 e 3. O manifesto do projeto guarda o efeito de cada cena e a intensidade usada nele; projetos antigos sem esse campo usam intensidade 1. A prévia e o FFmpeg usam a mesma intensidade. Ao abrir um projeto, a seleção do efeito é reconstruída das cenas, mesmo que o padrão atual nas Configurações seja outro. Aplicar um efeito a todas as cenas salva automaticamente o projeto já aberto; em um projeto novo, é preciso usar Salvar projeto. No instante inicial de uma cena, o movimento suave ainda está em seu quadro inicial; reproduza a prévia para observá-lo.
 
-## Parâmetros do Whisper
+## Idioma da narração
 
-A janela de Configurações guarda localmente o modelo (`tiny`, `base`, `small`, `medium` ou `large-v3`), o idioma (português, inglês ou detecção automática), o número de hipóteses da busca (1–10), as threads de CPU (1–16) e o filtro de silêncio VAD. Os padrões preservam o processamento anterior: `small`, português, 5 hipóteses, 4 threads e VAD ligado. Ao sincronizar, `WhisperSync` envia os valores ao script Python; a transcrição registra os parâmetros usados no relatório. O limite de pausa para mudar de cena continua configurável separadamente. Preferências anteriores são carregadas com os padrões e modelos maiores podem precisar de download e memória adicionais.
+A preferência global de idioma da narração é compartilhada entre o editor e o CLI. Preferências antigas de idioma são migradas; a detecção automática legada passa a português. A escolha afeta a síntese do CLI, não traduz o roteiro nem altera o idioma da interface.
 
 ## Etapa inicial — 8 de outubro de 2026
 
@@ -120,17 +120,9 @@ Teste real concluído: duas chamadas à OpenAI usando gpt-image-2, qualidade low
 
 O manifesto aceita `animateImages` (false em projetos antigos). Quando true, o exporter aplica aproximação central suave de 5% por cena e fades curtos, sem mudar sua duração. A opção é preservada em snapshots e salvamentos. A montagem de três minutos sobre Google e energia nuclear usa esse modo; roteiro limpo, fontes e prompt editorial foram salvos junto ao projeto local. A sincronização definitiva depende da narração externa.
 
-## Alinhamento local da narração
+## Duração das cenas e narração
 
-`tools/transcribe_narration.py` usa faster-whisper 1.2.1, CPU int8, modelo multilingual small, idioma pt, VAD e tempos por palavra. PyAV foi fixado em 16.1.0 porque a versão 19 removeu um argumento utilizado por esse release do faster-whisper. Os arquivos de transcrição contêm o hash do áudio e ficam junto ao projeto, sem credenciais.
-
-`tools/sync_narration.py` normaliza acentos e pontuação e compara tokens em ordem com SequenceMatcher, sem descartar palavras frequentes. Exige cobertura global de 75%, cobertura de 65% por cena ou um prefixo falado contínuo que termine até 2,5s antes de uma âncora clara da próxima cena. Cruzamentos de timestamps de até 0,75s são resolvidos no ponto médio; conflitos maiores e cenas menores que 0,1s são rejeitados. Os cortes são arredondados a frames de 30 fps e a última cena preserva o fim do áudio. O manifesto é substituído por arquivo temporário depois da validação; roteiro, imagens, volumes, chave e demais metadados são preservados. Um backup ao lado do manifesto mantém os caminhos dos assets válidos.
-
-O alinhamento não cria cenas a partir de silêncio: ele só corta entre cenas já ancoradas no texto. O limite da pausa é configurado em **Configurações** (padrão 1 segundo, válido de 0,1 a 30 segundos) e passado à rotina de sincronização; o projeto não precisa carregar esse ajuste. Quando a pausa entre a última palavra de uma cena e a primeira da próxima atinge o limite, o corte ocorre 0,2 segundo após a fala anterior; em pausas menores, fica no ponto médio. Isso atende à gravação humana que usa pausas para indicar transições sem inventar cortes em hesitações dentro de uma cena. O relatório registra o limite usado, a duração da pausa e o tipo de corte. Silêncios de pelo menos 1 segundo antes da primeira fala ou após a última são sinalizados no relatório e na UI; não são removidos automaticamente do arquivo de áudio.
-
-O botão **Sincronizar com whisper**, abaixo de **Anexar narração**, executa transcrição e alinhamento em segundo plano e recarrega a timeline após a aplicação. O editor bloqueia alterações durante a operação para evitar conflito de gravação. A distribuição leva os scripts `tools/`; faster-whisper e seu modelo ficam instalados/cacheados localmente.
-
-Na produção Google/nuclear, a correspondência observada foi de 98,5%. Uma cópia do áudio removeu 4,39s de silêncio inicial e 4,075s finais, preservando as falas, as pausas internas e o original. A narração limpa ficou em 185,695s e a timeline em 185,700s. O relatório detalhado e as duas transcrições foram mantidos em `sincronizacao/` dentro do projeto local. Os testes Python verificam pausas, preservação do fim do áudio e rejeição de fala divergente ou tempos conflitantes.
+O CLI sintetiza e mede cada áudio de cena separadamente, atribui sua duração à cena e concatena as narrações. O exportador arredonda os limites acumulados aos quadros de 30 fps, evitando o acúmulo do erro de arredondamento individual. Ao anexar uma narração única no editor, `WhisperSync` executa os scripts locais de transcrição e alinhamento em segundo plano, salva os tempos das cenas e atualiza a timeline. O botão de repetição serve para recuperar uma falha; o alinhador rejeita fala divergente em vez de aplicar tempos incorretos. O modelo padrão é `small`, com idioma da preferência geral, busca 5, quatro threads e VAD ativo. Arquivos de projetos e caches anteriores não são removidos.
 
 ## Configurações e prompt base — 12 de outubro de 2026
 

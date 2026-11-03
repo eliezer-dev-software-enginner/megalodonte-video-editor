@@ -54,7 +54,7 @@ public final class VideoExporter {
             double narrationDuration;
             try { narrationDuration=Double.parseDouble(value); } catch(NumberFormatException e) { throw new IOException("Duração da narração inválida.",e); }
             if(narrationDuration>project.duration()+1)
-                throw new IOException(String.format(Locale.ROOT,"A narração dura %.1fs, mas as cenas somam %.1fs. Sincronize com Whisper antes de exportar para evitar cortar o vídeo.",narrationDuration,project.duration()));
+                throw new IOException(String.format(Locale.ROOT,"A narração dura %.1fs, mas as cenas somam %.1fs. Repita a sincronização da narração antes de exportar para evitar cortar o áudio.",narrationDuration,project.duration()));
         }
         for(var effect:project.effects) {
             try { effect.validate(); } catch(IllegalArgumentException e) { throw new IOException(e.getMessage(),e); }
@@ -65,6 +65,7 @@ public final class VideoExporter {
         Path work=Files.createTempDirectory(target.getParent(),".megalodonte-export-");
         try {
             var concat=new StringBuilder("ffconcat version 1.0\n");
+            long[] sceneFrames=sceneFrames(project.clips);
             for(int i=0;i<project.clips.size();i++) {
                 checkCancelled(); var clip=project.clips.get(i);
                 progress.accept("Exportando cena "+(i+1)+" de "+project.clips.size()+"…");
@@ -94,7 +95,7 @@ public final class VideoExporter {
                 }
                 var frame=work.resolve("frame.png"); ImageIO.write(image,"png",frame.toFile()); image.flush();
                 String name=String.format(Locale.ROOT,"scene-%06d.mp4",i);
-                long frames=Math.max(1,Math.round(clip.duration*30));
+                long frames=sceneFrames[i];
                 String filter="scale="+width+":"+height+":force_original_aspect_ratio=decrease,pad="+width+":"+height+":(ow-iw)/2:(oh-ih)/2:black,setsar=1";
                 if(project.animateImages) {
                     String zoom="1+0.05*on/"+Math.max(1,frames-1);
@@ -162,6 +163,15 @@ public final class VideoExporter {
         } finally {
             try(var paths=Files.walk(work)) { for(Path path:paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path); }
         }
+    }
+    /** Round cumulative scene boundaries so per-scene rounding cannot accumulate drift. */
+    static long[] sceneFrames(List<VideoProject.Clip> clips) {
+        var frames=new long[clips.size()];double elapsed=0;long previous=0;
+        for(int i=0;i<clips.size();i++) {
+            elapsed+=clips.get(i).duration;long boundary=Math.round(elapsed*30);
+            frames[i]=Math.max(1,boundary-previous);previous+=frames[i];
+        }
+        return frames;
     }
     private static void rejectOutputSource(Path output,String source) throws IOException {
         Path input=Path.of(source).toAbsolutePath().normalize();
