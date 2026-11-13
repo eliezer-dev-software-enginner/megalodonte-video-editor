@@ -39,6 +39,14 @@
       "type": "string",
       "initial": "5"
     },
+    "textoBreve": {
+      "type": "string",
+      "initial": ""
+    },
+    "textoBreveDica": {
+      "type": "string",
+      "initial": ""
+    },
     "mensagem": {
       "type": "string",
       "initial": "Cole o roteiro à direita. Separe as cenas com uma linha em branco."
@@ -795,6 +803,59 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "type": "Row",
+                    "props": {
+                      "spacing": 12
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 14
+                        },
+                        "props": {
+                          "text": "Texto breve"
+                        }
+                      },
+                      {
+                        "type": "Input",
+                        "id": "captionInput",
+                        "props": {
+                          "width": 320,
+                          "height": 36,
+                          "placeholder": "Vazio = sugestão a partir da fala da cena"
+                        },
+                        "bind": {
+                          "value": "textoBreve"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "applyCaptionButton",
+                        "props": {
+                          "text": "Aplicar texto",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "applyCaption"
+                        },
+                        "bind": {
+                          "disabled": "semSelecao"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Text",
+                    "id": "captionHint",
+                    "props": {
+                      "wrapWidth": 520
+                    },
+                    "bind": {
+                      "text": "textoBreveDica"
+                    }
                   },
                   {
                     "type": "Text",

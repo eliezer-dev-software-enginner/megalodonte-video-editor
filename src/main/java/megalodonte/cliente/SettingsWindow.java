@@ -10,11 +10,13 @@ import java.nio.file.Path;
 
 /** Native window host; every setting and control is defined by JSONC. */
 final class SettingsWindow implements AutoCloseable {
-    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,String avatarDirectory,String imagePrompt) throws IOException; }
+    /** Settings stored in the open project's manifest, not in the shared editor preferences. */
+    record ProjectOptions(String avatarDirectory,String imagePrompt,boolean sceneCaptions) {}
+    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,ProjectOptions project) throws IOException; }
     private final Stage stage=new Stage();
     private final UiSession session;
     private final javafx.scene.control.CheckBox notifyTelegram=new javafx.scene.control.CheckBox("Notificar no Telegram");
-    SettingsWindow(Window owner,EditorSettings.Values values,String avatarDirectory,String imagePrompt,Apply apply) {
+    SettingsWindow(Window owner,EditorSettings.Values values,ProjectOptions project,Apply apply) {
         stage.setTitle("Configurações · Megalodonte Video Editor");
         if(owner!=null) { stage.initOwner(owner); stage.initModality(Modality.WINDOW_MODAL); }
         else stage.initModality(Modality.APPLICATION_MODAL);
@@ -31,8 +33,9 @@ final class SettingsWindow implements AutoCloseable {
                     view.states().string("ffmpegExecutable").get(),view.states().string("ffprobeExecutable").get(),
                     notifyTelegram.isSelected(),EditorSettings.normalizeImages(view.states().string("imagesDirectory").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
-                apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()),
-                        VideoProject.validateImagePrompt(view.states().string("projectImagePrompt").get()));stage.close();
+                apply.accept(selected,new ProjectOptions(validateAvatarDirectory(view.states().string("avatarDirectory").get()),
+                        VideoProject.validateImagePrompt(view.states().string("projectImagePrompt").get()),
+                        "on".equals(view.states().string("sceneCaptions").get())));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
         }).register("cancelSettings",view -> stage.close())
           .register("showGeneral",view -> showSection(view,"General"))
@@ -66,11 +69,13 @@ final class SettingsWindow implements AutoCloseable {
         notifyTelegram.setSelected(values.notifyTelegram);
         session.states().set("apiKey",values.apiKey);session.states().set("soundsDirectory",values.soundsDirectory);
         session.states().set("imagesDirectory",values.imagesDirectory);
-        session.states().set("avatarDirectory",avatarDirectory);
+        session.states().set("avatarDirectory",project.avatarDirectory());
         session.states().set("ffmpegExecutable",values.ffmpegExecutable);
         session.states().set("ffprobeExecutable",values.ffprobeExecutable);
         session.states().set("basePrompt",values.basePrompt);
-        session.states().set("projectImagePrompt",imagePrompt==null ? "" : imagePrompt);
+        session.states().set("projectImagePrompt",project.imagePrompt()==null ? "" : project.imagePrompt());
+        session.states().set("sceneCaptionOptions","[{\"value\":\"off\",\"label\":\"Não mostrar texto sobre as imagens\"},{\"value\":\"on\",\"label\":\"Mostrar texto breve sobre a imagem de cada cena\"}]");
+        session.states().set("sceneCaptions",project.sceneCaptions() ? "on" : "off");
         session.states().set("defaultImagePrompt",ImageGenerationJob.DEFAULT_PROMPT);
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
         session.states().set("defaultVisualEffect",values.defaultVisualEffect);

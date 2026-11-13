@@ -122,6 +122,24 @@ class EditorViewTest {
                 assertNotNull(previewFrame.getClip(),"The 16:9 preview frame must clip animated image movement");
                 assertEquals(previewFrame.getWidth(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getWidth(),.01);
                 assertEquals(previewFrame.getHeight(),((javafx.scene.shape.Rectangle)previewFrame.getClip()).getHeight(),.01);
+                java.util.function.Supplier<javafx.scene.image.ImageView> captionLayer=()->(javafx.scene.image.ImageView)previewFrame.getChildren().getLast();
+                assertNull(captionLayer.get().getImage(),"Sem a opção do projeto, a prévia não mostra texto");
+                assertTrue(session.states().string("textoBreveDica").get().contains("Ative em Configurações"));
+                session.invoke("openSettings");
+                var captionSettings=(javafx.stage.Stage)javafx.stage.Window.getWindows().stream().filter(w->w instanceof javafx.stage.Stage s && s.getTitle().startsWith("Configurações")).findFirst().orElseThrow();
+                var captionRoot=captionSettings.getScene().getRoot();captionRoot.applyCss();
+                @SuppressWarnings("unchecked") var captionOption=(ComboBox<String>)captionRoot.lookupAll(".combo-box").stream()
+                    .filter(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("off","on"))).findFirst().orElseThrow();
+                assertEquals("off",captionOption.getValue());captionOption.setValue("on");
+                captionRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow().fire();
+                assertFalse(captionSettings.isShowing(),session.states().string("mensagem").get());
+                assertNotNull(captionLayer.get().getImage(),"Com a opção ativa, a prévia mostra o texto breve");
+                assertTrue(session.states().string("textoBreveDica").get().endsWith("Uma cidade ao amanhecer"));
+                session.states().set("textoBreve","  Amanhecer   na cidade ");session.invoke("applyCaption");
+                assertEquals("Amanhecer na cidade",session.states().get("textoBreve"));
+                assertTrue(session.states().string("textoBreveDica").get().startsWith("Texto próprio"));
+                Files.deleteIfExists(Path.of(System.getProperty("megalodonte.editor.settingsDir"),"editor-settings.json"));
+                session.states().set("imagem", fixture.toString()); // the fixture image is not attached to the scene itself
                 var overlay=(javafx.scene.canvas.Canvas)((javafx.scene.layout.StackPane)((Pane)preview.getJavaFxNode()).getChildren().getFirst()).getChildren().stream()
                     .filter(javafx.scene.canvas.Canvas.class::isInstance).findFirst().orElseThrow();
                 preview.setVisualEffect("particles",0,0);

@@ -62,6 +62,14 @@
       "type": "string",
       "initial": ""
     },
+    "sceneCaptions": {
+      "type": "string",
+      "initial": "off"
+    },
+    "sceneCaptionOptions": {
+      "type": "string",
+      "initial": "[]"
+    },
     "soundEffectPercent": {
       "type": "string",
       "initial": "100"
@@ -667,6 +675,30 @@
                         },
                         "props": {
                           "text": "Imagens do projeto"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Texto breve sobre a imagem"
+                        }
+                      },
+                      {
+                        "type": "Select",
+                        "id": "sceneCaptionsInput",
+                        "props": {
+                          "height": 36
+                        },
+                        "bind": {
+                          "value": "sceneCaptions",
+                          "items": "sceneCaptionOptions"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Mostra um texto curto no canto inferior esquerdo de cada cena, na prévia e no MP4, sem alterar nem regerar as imagens. Edite o texto de cada cena no painel da cena; vazio usa uma sugestão tirada da fala.",
+                          "wrapWidth": 520
                         }
                       },
                       {

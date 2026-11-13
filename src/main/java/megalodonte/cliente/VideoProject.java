@@ -14,6 +14,8 @@ public final class VideoProject {
         /** Exact PNG filename selected by a #avatar.png script marker. */
         public String avatar = "";
         public String visualEffect = "";
+        /** Optional short on-image text; blank uses a suggestion when the project shows captions. */
+        public String caption = "";
         public double duration = 5;
         public Clip(String text) { this.text = text; }
     }
@@ -67,10 +69,11 @@ public final class VideoProject {
         var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
         copy.avatarDirectory = avatarDirectory;
         copy.imagePrompt = imagePrompt;
+        copy.sceneCaptions = sceneCaptions;
         copy.visualEffectStrength = visualEffectStrength;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
-        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.avatar = clip.avatar; next.duration = clip.duration; next.visualEffect = clip.visualEffect; copy.clips.add(next); }
+        for (Clip clip : clips) { var next = new Clip(clip.text); next.image = clip.image; next.avatar = clip.avatar; next.duration = clip.duration; next.visualEffect = clip.visualEffect; next.caption = clip.caption; copy.clips.add(next); }
         for(var effect:effects) copy.effects.add(effect.copy());
         return copy;
     }
@@ -81,6 +84,8 @@ public final class VideoProject {
     /** Optional per-project image instructions; blank keeps the editor's built-in image prompt. */
     public String imagePrompt = "";
     public static final int MAX_IMAGE_PROMPT = 8000;
+    /** Shows each scene's short text over its image in the preview and in the export. */
+    public boolean sceneCaptions;
     public static String validateImagePrompt(String value) {
         String prompt = value == null ? "" : value.strip();
         if (prompt.length() > MAX_IMAGE_PROMPT)
@@ -153,12 +158,14 @@ public final class VideoProject {
         Map<Path,String> savedAssets = new HashMap<>();
         var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script);
         root.addProperty("avatarDirectory", avatarDirectory);
-        root.addProperty("imagePrompt", validateImagePrompt(imagePrompt)); var scenes = new JsonArray();
+        root.addProperty("imagePrompt", validateImagePrompt(imagePrompt));
+        root.addProperty("sceneCaptions", sceneCaptions); var scenes = new JsonArray();
         for (Clip clip : clips) {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
             String image = copyAsset(clip.image, absolute, assets, savedAssets);
             scene.addProperty("image", image); scene.addProperty("avatar", clip.avatar); scenes.add(scene);
             validateVisualEffect(clip.visualEffect);scene.addProperty("visualEffect",clip.visualEffect);
+            scene.addProperty("caption",SceneCaption.validate(clip.caption));
         }
         root.add("clips", scenes); root.addProperty("animateImages", animateImages);
         validateVisualEffectStrength(visualEffectStrength);
@@ -200,6 +207,7 @@ public final class VideoProject {
                 project.avatarDirectory = file.toAbsolutePath().getParent().resolve(project.avatarDirectory).normalize().toString();
             if (root.has("imagePrompt") && !root.get("imagePrompt").isJsonNull())
                 project.imagePrompt = validateImagePrompt(root.get("imagePrompt").getAsString());
+            if (root.has("sceneCaptions")) project.sceneCaptions = root.get("sceneCaptions").getAsBoolean();
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
             if (root.has("visualEffectStrength")) project.visualEffectStrength = root.get("visualEffectStrength").getAsDouble();
             validateVisualEffectStrength(project.visualEffectStrength);
@@ -212,6 +220,7 @@ public final class VideoProject {
                 clip.avatar=scene.has("avatar") ? scene.get("avatar").getAsString() : "";
                 clip.visualEffect=scene.has("visualEffect") ? scene.get("visualEffect").getAsString() : "";
                 validateVisualEffect(clip.visualEffect);
+                if (scene.has("caption") && !scene.get("caption").isJsonNull()) clip.caption = SceneCaption.validate(scene.get("caption").getAsString());
                 project.clips.add(clip);
             }
             if (root.has("audio")) {

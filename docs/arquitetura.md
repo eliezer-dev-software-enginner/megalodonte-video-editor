@@ -158,3 +158,15 @@ Na interface, a seção **Imagens do projeto** em Configurações edita o campo,
 
 Testes: `OpenAiImageIntegrationTest.projectImagePromptReplacesDefaultInstructionsAndPersists` (prompt enviado, separação de cache, persistência e limite) e `EditorViewTest` (navegação, prompt padrão visível e reabertura da janela com o valor do projeto).
 
+## Texto breve sobre a cena — 13 de novembro de 2026
+
+Pedido: mostrar um texto curto sobre cada imagem sem regerar as imagens já pagas. Pedir o texto ao modelo de imagem foi descartado: exigiria regerar, e modelos de imagem escrevem mal (o prompt do FLU004 proíbe texto justamente por isso). O texto passa a ser uma camada do editor.
+
+O manifesto ganhou `sceneCaptions` (boolean do projeto, falso por padrão) e `clips[].caption` (até 90 caracteres). `SceneCaption.effective` devolve vazio com a opção desligada, o texto da cena quando preenchido ou uma sugestão determinística (`suggest`: primeira frase; se tiver mais de oito palavras, a primeira oração; se ainda for longa, sete palavras e reticências). Nenhuma chamada de rede.
+
+Um único renderizador Java2D (`SceneCaption.render`) gera uma camada ARGB transparente do tamanho do quadro, com caixa escura translúcida, faixa ciano e texto branco em até duas linhas, no canto inferior esquerdo (o avatar ocupa o inferior direito). A prévia (`CaptionPreview`) carrega essa camada em 1920×1080 num `ImageView` ajustado ao quadro 16:9, acima do avatar; a exportação grava o mesmo PNG e o sobrepõe no `filter_complex` depois do filtro da cena e do avatar. Assim prévia e MP4 coincidem e o texto não depende de fontes do FFmpeg nem acompanha zoom, deslocamento ou tremor.
+
+A opção fica em **Configurações → Imagens do projeto**, como `Select` declarativo (o JSONC UI não tem checkbox). `SettingsWindow.ProjectOptions` agrupa as opções que pertencem ao manifesto (pasta de avatar, prompt de imagens e texto breve). O texto por cena é editado no painel da cena (`applyCaption`).
+
+Testes: `SceneCaptionTest` (sugestão, validação, persistência, manifesto antigo e área desenhada), `VideoExporterTest.sceneCaptionIsBurnedAfterVisualEffectsOnlyWhenEnabled` (quadros reais em dois instantes, com movimento suave) e `EditorViewTest` (opção, dica, camada da prévia e edição do texto).
+

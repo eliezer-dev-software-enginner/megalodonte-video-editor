@@ -54,9 +54,10 @@ public final class Editor extends ViewScript {
                 settings.basePrompt,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.narrationLanguage,settings.soundEffectPercent,
-                settings.ffmpegExecutable,settings.ffprobeExecutable,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,project.imagePrompt,(values,avatarDirectory,imagePrompt) -> {
+                settings.ffmpegExecutable,settings.ffprobeExecutable,settings.notifyTelegram,settings.imagesDirectory),new SettingsWindow.ProjectOptions(project.avatarDirectory,project.imagePrompt,project.sceneCaptions),(values,options) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
-            project.avatarDirectory=avatarDirectory;project.imagePrompt=imagePrompt;
+            project.avatarDirectory=options.avatarDirectory();project.imagePrompt=options.imagePrompt();
+            project.sceneCaptions=options.sceneCaptions();refreshSelection();
             if(!project.clips.isEmpty()) {
                 project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
             }
@@ -368,12 +369,19 @@ public final class Editor extends ViewScript {
         double start=0;for(int i=0;i<selected;i++)start+=project.clips.get(i).duration;
         ((ImagePreview)component("preview")).setVisualEffect(clip.visualEffect,selected,playhead-start,project.visualEffectStrength);
         String error=avatarPreview().show(project.avatarDirectory,clip.avatar,!clip.image.isBlank());
+        captionPreview.show(SceneCaption.effective(project,clip));
         if(error!=null)message(error);
     }
+    private CaptionPreview captionPreview;
+    /** Creates the avatar layer before the caption layer so captions stay on top. */
     private AvatarPreview avatarPreview() {
-        if(avatarPreview==null)avatarPreview=new AvatarPreview((ImagePreview)component("preview"));
+        if(avatarPreview==null) {
+            avatarPreview=new AvatarPreview((ImagePreview)component("preview"));
+            captionPreview=new CaptionPreview((ImagePreview)component("preview"));
+        }
         return avatarPreview;
     }
+    String previewCaption() { avatarPreview();return captionPreview.caption(); }
     private void timelineChanged() { pausePlayback(); playhead = 0; audio.seek(0); }
 
     @Override public void onMount() {
@@ -419,6 +427,10 @@ public final class Editor extends ViewScript {
         timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = parsed; project.animateImages=previous.animateImages;
         scriptAvatarsManaged=VideoProject.hasAvatarMarkers(text("roteiro"));
         project.avatarDirectory=previous.avatarDirectory;project.imagePrompt=previous.imagePrompt;
+        project.sceneCaptions=previous.sceneCaptions;
+        var previousCaptions=new HashMap<String,String>();
+        for(var old:previous.clips) if(!old.caption.isBlank()) previousCaptions.putIfAbsent(old.text,old.caption);
+        for(var clip:project.clips) clip.caption=previousCaptions.getOrDefault(clip.text,"");
         project.visualEffectStrength=previous.visualEffectStrength;
         if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;
@@ -483,8 +495,18 @@ public final class Editor extends ViewScript {
         String effectLabel=clip==null || clip.visualEffect.isBlank() ? "" : switch(clip.visualEffect) { case "shake"->" · ✦ Tremor leve";case "smooth"->" · ✦ Movimento suave";default->" · ✦ Partículas"; };
         set("cenaTexto", clip == null ? "Nenhuma cena selecionada" : "Cena " + (index() + 1) + effectLabel + " · " + (clip.text.length() > 160 ? clip.text.substring(0,160) + "…" : clip.text));
         set("duracao", clip == null ? "5" : Double.toString(clip.duration));
+        set("textoBreve", clip == null ? "" : clip.caption);
+        set("textoBreveDica", !project.sceneCaptions ? "Ative em Configurações → Imagens do projeto para mostrar o texto sobre a imagem."
+                : clip == null ? "" : clip.caption.isBlank() ? "Sugestão automática em uso: "+SceneCaption.suggest(clip.text) : "Texto próprio da cena. Apague e aplique para voltar à sugestão.");
         if(clip!=null)refreshVisualPreview();
-        else { ((ImagePreview)component("preview")).setVisualEffect("",0,0);avatarPreview().show("","",false); }
+        else { ((ImagePreview)component("preview")).setVisualEffect("",0,0);avatarPreview().show("","",false);captionPreview.show(""); }
+    }
+    public void applyCaption() { if(generationBusy()) return;
+        var clip = selected(); if (clip == null) return;
+        try { clip.caption=SceneCaption.validate(text("textoBreve")); }
+        catch(IllegalArgumentException e) { message(e.getMessage());return; }
+        refreshSelection();
+        message(project.sceneCaptions ? "Texto breve da cena atualizado." : "Texto breve guardado. Ative-o em Configurações → Imagens do projeto para exibi-lo.");
     }
     public void applyDuration() { if(generationBusy()) return;
         var clip = selected(); if (clip == null) return;

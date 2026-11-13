@@ -118,11 +118,26 @@ public final class VideoExporter {
                         +":x='"+(marginX/2)+"+"+(marginX/4)+"*sin(n*0.31)':y='"+(marginY/2)+"+"+(marginY/4)+"*cos(n*0.27)',scale="+width+":"+height+",setsar=1";
                 }
                 var command=command(); Collections.addAll(command,"-loop","1","-framerate","30","-i",frame.toString());
-                if(avatars.get(i)!=null && !staticAvatar) {
-                    Collections.addAll(command,"-loop","1","-framerate","30","-i",avatars.get(i).toString());
-                    String avatarFilter="[0:v]"+filter+"[background];[1:v]scale=-1:"+Math.round(height*.72)+":flags=lanczos[avatar];"
-                            +"[background][avatar]overlay=x=W-w-"+Math.round(width*.025)+":y=H-h:format=auto,format=yuv420p[video]";
-                    Collections.addAll(command,"-filter_complex",avatarFilter,"-map","[video]");
+                boolean animatedAvatar=avatars.get(i)!=null && !staticAvatar;
+                String caption=SceneCaption.effective(project,clip);
+                if(animatedAvatar || !caption.isBlank()) {
+                    // Overlays are applied after the scene effect so zoom, shake and particles never move them.
+                    var graph=new StringBuilder("[0:v]").append(filter).append("[background]");
+                    String current="background";int input=1;
+                    if(animatedAvatar) {
+                        Collections.addAll(command,"-loop","1","-framerate","30","-i",avatars.get(i).toString());
+                        graph.append(";[").append(input).append(":v]scale=-1:").append(Math.round(height*.72)).append(":flags=lanczos[avatar];[")
+                             .append(current).append("][avatar]overlay=x=W-w-").append(Math.round(width*.025)).append(":y=H-h:format=auto[withAvatar]");
+                        current="withAvatar";input++;
+                    }
+                    if(!caption.isBlank()) {
+                        Path layer=work.resolve("caption.png");Files.write(layer,SceneCaption.png(caption,width,height));
+                        Collections.addAll(command,"-loop","1","-framerate","30","-i",layer.toString());
+                        graph.append(";[").append(input).append(":v]format=rgba[caption];[").append(current).append("][caption]overlay=0:0:format=auto[withCaption]");
+                        current="withCaption";
+                    }
+                    graph.append(";[").append(current).append("]format=yuv420p[video]");
+                    Collections.addAll(command,"-filter_complex",graph.toString(),"-map","[video]");
                 } else Collections.addAll(command,"-vf",filter);
                 Collections.addAll(command,"-frames:v",Long.toString(frames),
                     "-c:v","libx264","-preset","fast","-crf","20","-pix_fmt","yuv420p","-threads","2","-an",work.resolve(name).toString());

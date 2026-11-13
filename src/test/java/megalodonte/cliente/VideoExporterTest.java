@@ -32,6 +32,25 @@ class VideoExporterTest {
         project.avatarDirectory=directory.resolve("missing").toString();
         assertThrows(IOException.class,()->new VideoExporter(320,180).export(project,output,m->{}));
     }
+    @Test void sceneCaptionIsBurnedAfterVisualEffectsOnlyWhenEnabled() throws Exception {
+        var project=VideoProject.fromScript("Monitor de lotes. Confira o status.\n\nSegunda cena.");
+        var still=image("caption-bg.png",Color.WHITE);
+        project.clips.forEach(clip->{clip.image=still.toString();clip.duration=.4;clip.visualEffect="smooth";});
+        project.clips.get(1).caption="Texto próprio";
+        var plain=directory.resolve("plain.mp4");new VideoExporter(640,360).export(project,plain,m->{});
+        assertTrue(new Color(frameAt(plain,.1).getRGB(60,302)).getRed()>200,"Sem a opção, a imagem fica sem texto");
+        project.sceneCaptions=true;
+        var captioned=directory.resolve("captioned.mp4");new VideoExporter(640,360).export(project,captioned,m->{});
+        for(double time:new double[]{.1,.6}) {
+            var frame=frameAt(captioned,time);
+            assertTrue(new Color(frame.getRGB(60,302)).getRed()<90,"Caixa escura do texto no canto inferior esquerdo em "+time+"s");
+            assertTrue(new Color(frame.getRGB(600,40)).getRed()>200,"O restante da imagem continua visível");
+        }
+    }
+    private BufferedImage frameAt(Path video,double seconds) throws Exception {
+        byte[] frame=binaryCommand("ffmpeg","-v","error","-ss",Double.toString(seconds),"-i",video.toString(),"-frames:v","1","-f","image2pipe","-vcodec","png","pipe:1");
+        return ImageIO.read(new ByteArrayInputStream(frame));
+    }
     @Test void refusesToSilentlyCutLongNarration() throws Exception {
         var project=VideoProject.fromScript("Cena");
         project.clips.getFirst().image=image("cena.png",Color.BLUE).toString();
