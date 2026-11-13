@@ -59,4 +59,35 @@ class OpenAiImageIntegrationTest {
             assertEquals(List.of(0,1,2,3),ImageGenerationJob.pending(VideoProject.fromScript("1\n\n2\n\n3\n\n4")));
         } finally { server.stop(0); }
     }
+    @Test void projectImagePromptReplacesDefaultInstructionsAndPersists() throws Exception {
+        var image=new BufferedImage(32,18,BufferedImage.TYPE_INT_RGB); var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);
+        var prompts=new ArrayList<String>(); var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/",exchange-> {
+            var request=JsonParser.parseString(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            prompts.add(request.get("prompt").getAsString());
+            byte[] response=("{\"data\":[{\"b64_json\":\""+Base64.getEncoder().encodeToString(bytes.toByteArray())+"\"}]}").getBytes();
+            exchange.sendResponseHeaders(200,response.length);exchange.getResponseBody().write(response);exchange.close();
+        });server.start();
+        try {
+            var client=new OpenAiImageClient("dummy-test-key","gpt-image-2","1536x864","low",URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/"));
+            Path library=directory.resolve("library");
+            var standard=VideoProject.fromScript("Monitor de lotes.");
+            new ImageGenerationJob(client).run(standard,directory.resolve("a"),library,(i,f)->standard.clips.get(i).image=f.toString(),p->{});
+            assertTrue(prompts.get(0).startsWith(ImageGenerationJob.DEFAULT_PROMPT+" Contexto do roteiro: "));
+            var custom=VideoProject.fromScript("Monitor de lotes.");custom.imagePrompt="  Ilustração corporativa flat em azul.  ";
+            new ImageGenerationJob(client).run(custom,directory.resolve("b"),library,(i,f)->custom.clips.get(i).image=f.toString(),p->{});
+            assertEquals(2,prompts.size(),"Um prompt próprio não reaproveita imagem gerada com o prompt padrão");
+            assertTrue(prompts.get(1).startsWith("Ilustração corporativa flat em azul.\n\nContexto do roteiro: "));
+            assertFalse(prompts.get(1).contains(ImageGenerationJob.DEFAULT_PROMPT));
+            assertTrue(prompts.get(1).endsWith("Cena 1: Monitor de lotes."));
+            var again=VideoProject.fromScript("Monitor de lotes.");again.imagePrompt="Ilustração corporativa flat em azul.";
+            new ImageGenerationJob(client).run(again,directory.resolve("c"),library,(i,f)->again.clips.get(i).image=f.toString(),p->{});
+            assertEquals(2,prompts.size(),"O mesmo prompt próprio reaproveita a biblioteca");
+            Path manifest=directory.resolve("custom.mvideo.json");custom.save(manifest);
+            assertEquals("Ilustração corporativa flat em azul.",VideoProject.load(manifest).imagePrompt);
+            assertEquals("Ilustração corporativa flat em azul.",VideoProject.load(manifest).snapshot().imagePrompt);
+            custom.imagePrompt="x".repeat(VideoProject.MAX_IMAGE_PROMPT+1);
+            assertThrows(IllegalArgumentException.class,()->custom.save(directory.resolve("too-long.mvideo.json")));
+        } finally { server.stop(0); }
+    }
 }

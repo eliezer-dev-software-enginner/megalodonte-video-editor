@@ -10,11 +10,11 @@ import java.nio.file.Path;
 
 /** Native window host; every setting and control is defined by JSONC. */
 final class SettingsWindow implements AutoCloseable {
-    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,String avatarDirectory) throws IOException; }
+    @FunctionalInterface interface Apply { void accept(EditorSettings.Values values,String avatarDirectory,String imagePrompt) throws IOException; }
     private final Stage stage=new Stage();
     private final UiSession session;
     private final javafx.scene.control.CheckBox notifyTelegram=new javafx.scene.control.CheckBox("Notificar no Telegram");
-    SettingsWindow(Window owner,EditorSettings.Values values,String avatarDirectory,Apply apply) {
+    SettingsWindow(Window owner,EditorSettings.Values values,String avatarDirectory,String imagePrompt,Apply apply) {
         stage.setTitle("Configurações · Megalodonte Video Editor");
         if(owner!=null) { stage.initOwner(owner); stage.initModality(Modality.WINDOW_MODAL); }
         else stage.initModality(Modality.APPLICATION_MODAL);
@@ -31,7 +31,8 @@ final class SettingsWindow implements AutoCloseable {
                     view.states().string("ffmpegExecutable").get(),view.states().string("ffprobeExecutable").get(),
                     notifyTelegram.isSelected(),EditorSettings.normalizeImages(view.states().string("imagesDirectory").get()));
                 if(selected.basePrompt.isBlank()) throw new IllegalArgumentException("Informe um prompt base.");
-                apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()));stage.close();
+                apply.accept(selected,validateAvatarDirectory(view.states().string("avatarDirectory").get()),
+                        VideoProject.validateImagePrompt(view.states().string("projectImagePrompt").get()));stage.close();
             } catch(IOException | RuntimeException e) { view.states().set("mensagem",e.getMessage()); }
         }).register("cancelSettings",view -> stage.close())
           .register("showGeneral",view -> showSection(view,"General"))
@@ -39,6 +40,8 @@ final class SettingsWindow implements AutoCloseable {
           .register("showTools",view -> showSection(view,"Tools"))
           .register("showAvatar",view -> showSection(view,"Avatar"))
           .register("showPrompt",view -> showSection(view,"Prompt"))
+          .register("showImages",view -> showSection(view,"Images"))
+          .register("clearImagePrompt",view -> view.states().set("projectImagePrompt",""))
           .register("resetPrompt",view -> view.states().set("basePrompt",EditorSettings.defaultPrompt()))
           .register("chooseSounds",view -> {
               var chooser=new DirectoryChooser();chooser.setTitle("Selecionar biblioteca de sons");
@@ -67,6 +70,8 @@ final class SettingsWindow implements AutoCloseable {
         session.states().set("ffmpegExecutable",values.ffmpegExecutable);
         session.states().set("ffprobeExecutable",values.ffprobeExecutable);
         session.states().set("basePrompt",values.basePrompt);
+        session.states().set("projectImagePrompt",imagePrompt==null ? "" : imagePrompt);
+        session.states().set("defaultImagePrompt",ImageGenerationJob.DEFAULT_PROMPT);
         session.states().set("visualEffectOptions","[{\"value\":\"none\",\"label\":\"Nenhum\"},{\"value\":\"smooth\",\"label\":\"Movimento suave\"},{\"value\":\"particles\",\"label\":\"Partículas\"},{\"value\":\"shake\",\"label\":\"Tremor leve\"}]");
         session.states().set("defaultVisualEffect",values.defaultVisualEffect);
         session.states().set("visualEffectStrength",Double.toString(values.visualEffectStrength));
@@ -83,7 +88,7 @@ final class SettingsWindow implements AutoCloseable {
         stage.setOnHidden(event -> { session.states().set("apiKey",""); session.close();stage.setScene(null); });
     }
     private static void showSection(UiSession view,String selected) {
-        for(String section: new String[]{"General","Visual","Tools","Avatar","Prompt"}) {
+        for(String section: new String[]{"General","Visual","Tools","Avatar","Prompt","Images"}) {
             boolean active=section.equals(selected);
             view.states().set("show"+section,active);
             var button=(javafx.scene.control.Button)view.component("settingsNav"+section).getJavaFxNode();

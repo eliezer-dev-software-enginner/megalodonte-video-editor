@@ -30,10 +30,10 @@ final class ImageGenerationJob {
             check();
             String plainScript=VideoProject.withoutAvatarMarkers(project.script);
             String context=plainScript.length()>4000 ? plainScript.substring(0,4000) : plainScript;
-            String prompt="Crie uma imagem para um vídeo horizontal 16:9. Composição cinematográfica, sem legendas, letras, logotipos ou marcas d'água. "
-                +"Mantenha coerência visual com o roteiro. Contexto do roteiro: "+context+"\nCena "+(index+1)+": "+project.clips.get(index).text;
+            String prompt=prompt(project,context,index);
             String scene=project.clips.get(index).text;
-            String identity="image-v1\n"+client.cacheIdentity()+"\n"+context.strip()+"\n"+scene.strip();
+            String configuration=configuration(project);
+            String identity="image-v1\n"+configuration+"\n"+context.strip()+"\n"+scene.strip();
             String hash;
             try { hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
             catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
@@ -42,7 +42,7 @@ final class ImageGenerationJob {
             boolean reusable=ImageLibrary.validImage(shared);
             boolean matchedRelatedContext=false;
             if(!reusable) {
-                var match=ImageLibrary.find(library,scene,context,client.cacheIdentity());
+                var match=ImageLibrary.find(library,scene,context,configuration);
                 if(match.isPresent()){shared=match.get();reusable=true;matchedRelatedContext=true;}
             }
             if(reusable) progress.accept("Reutilizando imagem da cena "+(index+1)+" de "+project.clips.size()+"…");
@@ -52,7 +52,7 @@ final class ImageGenerationJob {
                 try { Files.write(temp,png);check();Files.move(temp,shared,StandardCopyOption.REPLACE_EXISTING); }
                 finally { Files.deleteIfExists(temp); }
             }
-            if(!matchedRelatedContext)ImageLibrary.record(shared,scene,context,client.cacheIdentity());
+            if(!matchedRelatedContext)ImageLibrary.record(shared,scene,context,configuration);
             Path file=assets.resolve(shared.getFileName());
             if(!shared.toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize())) {
                 Path temp=Files.createTempFile(assets,".image-",".tmp");
@@ -61,6 +61,25 @@ final class ImageGenerationJob {
             }
             check();ready.accept(index,file.toAbsolutePath());
         }
+    }
+    /** Built-in instructions used when the project does not define its own image prompt. */
+    static final String DEFAULT_PROMPT="Crie uma imagem para um vídeo horizontal 16:9. Composição cinematográfica, sem legendas, letras, logotipos ou marcas d'água. "
+        +"Mantenha coerência visual com o roteiro.";
+    /** The project prompt replaces only the instructions; script context and scene text are always appended. */
+    static String prompt(VideoProject project,String context,int index) {
+        String custom=VideoProject.validateImagePrompt(project.imagePrompt);
+        String scene="Cena "+(index+1)+": "+project.clips.get(index).text;
+        if(custom.isBlank()) return DEFAULT_PROMPT+" Contexto do roteiro: "+context+"\n"+scene;
+        return custom+"\n\nContexto do roteiro: "+context+"\n"+scene;
+    }
+    /** Custom prompts get their own cache identity so the library never reuses an image made under other instructions. */
+    private String configuration(VideoProject project) {
+        String custom=VideoProject.validateImagePrompt(project.imagePrompt);
+        if(custom.isBlank()) return client.cacheIdentity();
+        try {
+            byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(custom.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return client.cacheIdentity()+"\nprompt:"+java.util.HexFormat.of().formatHex(digest).substring(0,16);
+        } catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
     private static String slug(String scene) {
         var stop=Set.of("a","ao","as","com","da","das","de","do","dos","e","em","na","nas","no","nos","o","os","para","por","que","um","uma","the","an","and","at","for","in","of","on","to","with");

@@ -54,15 +54,15 @@ public final class Editor extends ViewScript {
                 settings.basePrompt,settings.defaultVisualEffect,
                 project.clips.isEmpty() ? settings.visualEffectStrength : project.visualEffectStrength,
                 settings.narrationLanguage,settings.soundEffectPercent,
-                settings.ffmpegExecutable,settings.ffprobeExecutable,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,(values,avatarDirectory) -> {
+                settings.ffmpegExecutable,settings.ffprobeExecutable,settings.notifyTelegram,settings.imagesDirectory),project.avatarDirectory,project.imagePrompt,(values,avatarDirectory,imagePrompt) -> {
             settingsStore.save(values);settings=values;settingsLoaded=true;set("openaiKey",values.apiKey);
-            project.avatarDirectory=avatarDirectory;
+            project.avatarDirectory=avatarDirectory;project.imagePrompt=imagePrompt;
             if(!project.clips.isEmpty()) {
                 project.visualEffectStrength=values.visualEffectStrength;refreshVisualPreview();
             }
             if(projectFile!=null)saveProject();
             if(project.clips.isEmpty())syncMotionSelection();
-            if(projectFile==null)message("Configurações salvas. Salve o projeto para manter a pasta de avatares e a intensidade visual.");
+            if(projectFile==null)message("Configurações salvas. Salve o projeto para manter a pasta de avatares, o prompt de imagens e a intensidade visual.");
         });
         settingsWindow.show();
     }
@@ -418,7 +418,7 @@ public final class Editor extends ViewScript {
         catch(IllegalArgumentException e) { message(e.getMessage()); return; }
         timelineChanged(); var previous=project; String selectedMotion=text("motionEffect"); project = parsed; project.animateImages=previous.animateImages;
         scriptAvatarsManaged=VideoProject.hasAvatarMarkers(text("roteiro"));
-        project.avatarDirectory=previous.avatarDirectory;
+        project.avatarDirectory=previous.avatarDirectory;project.imagePrompt=previous.imagePrompt;
         project.visualEffectStrength=previous.visualEffectStrength;
         if(!selectedMotion.equals("custom")) assignMotion(project,selectedMotion);
         project.narration.file=previous.narration.file; project.narration.volume=previous.narration.volume;

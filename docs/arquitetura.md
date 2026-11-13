@@ -2,7 +2,7 @@
 
 ## Navegação das Configurações
 
-A janela de Configurações usa uma barra lateral com Geral, Efeitos visuais, Ferramentas, Avatar e Prompt base. A seção ativa aparece no painel à direita; as demais ficam ocultas e não ocupam espaço. Os estados dos campos continuam vivos durante a navegação e o botão Salvar configurações grava tudo de uma vez. A estrutura e os controles permanecem declarados em `settings.view.jsonc`.
+A janela de Configurações usa uma barra lateral com Geral, Efeitos visuais, Ferramentas, Avatar, Prompt base e Imagens do projeto. A seção ativa aparece no painel à direita; as demais ficam ocultas e não ocupam espaço. Os estados dos campos continuam vivos durante a navegação e o botão Salvar configurações grava tudo de uma vez. A estrutura e os controles permanecem declarados em `settings.view.jsonc`.
 
 Na seção Geral, **Cobertura de efeitos sonoros** permite 0%, 25%, 50%, 75% ou 100% das cenas. O botão **Aplicar sons** prioriza as combinações cena/arquivo com maior relevância de tags e limita a quantidade de cenas com efeitos ao teto desse percentual; cenas que já têm efeitos não são apagadas ao reduzir a preferência. A música de fundo é selecionada independentemente desse limite. Preferências antigas usam 100%, reproduzindo a cobertura anterior.
 
@@ -145,3 +145,16 @@ O botão **Aplicar sons** lê os catálogos `TXT.txt` ao lado dos arquivos. Cada
 `SoundSequence` foi adicionado ao módulo megalodonte-jsonc-ui com bindings `items`/`selected` e evento `onSelect`. Usa HorizontalScroll Megalodonte, régua em segundos, blocos selecionáveis por mouse/teclado e linhas adicionais para sobreposições. Os controles de edição permanecem no JSONC do editor.
 
 AudioPreview mantém players independentes, agenda entradas/saídas pelo relógio do vídeo e atualiza envelopes de volume. VideoExporter aplica recorte, volume, fades e atraso por amostra antes da mixagem com limitador. O arquivo original termina naturalmente, sem repetição automática dos efeitos. As entradas são absolutas; mudanças estruturais nas cenas exigem revisão dos tempos.
+
+## Prompt de imagens por projeto — 13 de novembro de 2026
+
+As instruções fixas de `ImageGenerationJob` (estilo cinematográfico genérico) não servem para todo vídeo; um manual de sistema, por exemplo, precisa de ilustrações didáticas e sem texto. O manifesto passou a aceitar `imagePrompt` (string opcional, até 8000 caracteres). Vazio ou ausente mantém exatamente o prompt anterior, `ImageGenerationJob.DEFAULT_PROMPT`, então projetos existentes geram o mesmo pedido e continuam reaproveitando a biblioteca.
+
+Quando preenchido, o prompt do projeto substitui somente as instruções; o editor sempre acrescenta `Contexto do roteiro` (até 4000 caracteres, sem marcações de avatar) e `Cena N: texto`. Assim, o autor do prompt não precisa conhecer placeholders, e a ordem e a identidade das cenas continuam garantidas pelo código.
+
+A identidade de cache da biblioteca global inclui os 16 primeiros caracteres do SHA-256 do prompt próprio. Decisão: uma imagem gerada sob outras instruções não é reaproveitada, mesmo com cena e contexto iguais; o mesmo prompt próprio reaproveita normalmente. O prompt padrão continua sem esse sufixo para preservar a compatibilidade dos metadados já gravados.
+
+Na interface, a seção **Imagens do projeto** em Configurações edita o campo, mostra o prompt padrão para referência e oferece **Usar prompt padrão** (esvazia o campo). O valor segue o mesmo caminho da pasta de avatar: pertence ao projeto aberto, é salvo no manifesto e não entra em `editor-settings.json`. Recriar cenas, snapshots e a detecção de alterações não salvas preservam o campo. O CLI usa o campo quando o projeto o tiver, mas ainda não tem opção para defini-lo em um projeto novo.
+
+Testes: `OpenAiImageIntegrationTest.projectImagePromptReplacesDefaultInstructionsAndPersists` (prompt enviado, separação de cache, persistência e limite) e `EditorViewTest` (navegação, prompt padrão visível e reabertura da janela com o valor do projeto).
+

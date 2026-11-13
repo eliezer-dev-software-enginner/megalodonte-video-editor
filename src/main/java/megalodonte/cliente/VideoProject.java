@@ -66,6 +66,7 @@ public final class VideoProject {
     public VideoProject snapshot() {
         var copy = new VideoProject(); copy.script = script; copy.animateImages = animateImages;
         copy.avatarDirectory = avatarDirectory;
+        copy.imagePrompt = imagePrompt;
         copy.visualEffectStrength = visualEffectStrength;
         copy.narration.file = narration.file; copy.narration.volume = narration.volume;
         copy.music.file = music.file; copy.music.volume = music.volume;
@@ -77,6 +78,15 @@ public final class VideoProject {
     public String script = "";
     /** Optional avatar library chosen for this project; files remain in their original folder. */
     public String avatarDirectory = "";
+    /** Optional per-project image instructions; blank keeps the editor's built-in image prompt. */
+    public String imagePrompt = "";
+    public static final int MAX_IMAGE_PROMPT = 8000;
+    public static String validateImagePrompt(String value) {
+        String prompt = value == null ? "" : value.strip();
+        if (prompt.length() > MAX_IMAGE_PROMPT)
+            throw new IllegalArgumentException("O prompt de imagens do projeto deve ter até " + MAX_IMAGE_PROMPT + " caracteres.");
+        return prompt;
+    }
     public boolean animateImages;
     /** Shared intensity for visual effects; stored with the project so exports are reproducible. */
     public double visualEffectStrength = 1.0;
@@ -142,7 +152,8 @@ public final class VideoProject {
         Path assets = absolute.getParent().resolve(absolute.getFileName() + ".assets"); Files.createDirectories(assets);
         Map<Path,String> savedAssets = new HashMap<>();
         var root = new JsonObject(); root.addProperty("version", 1); root.addProperty("aspectRatio",ASPECT_RATIO); root.addProperty("script", script);
-        root.addProperty("avatarDirectory", avatarDirectory); var scenes = new JsonArray();
+        root.addProperty("avatarDirectory", avatarDirectory);
+        root.addProperty("imagePrompt", validateImagePrompt(imagePrompt)); var scenes = new JsonArray();
         for (Clip clip : clips) {
             var scene = new JsonObject(); scene.addProperty("text", clip.text); scene.addProperty("duration", clip.duration);
             String image = copyAsset(clip.image, absolute, assets, savedAssets);
@@ -187,6 +198,8 @@ public final class VideoProject {
                 project.avatarDirectory = root.get("avatarDirectory").getAsString();
             if (!project.avatarDirectory.isBlank() && !Path.of(project.avatarDirectory).isAbsolute())
                 project.avatarDirectory = file.toAbsolutePath().getParent().resolve(project.avatarDirectory).normalize().toString();
+            if (root.has("imagePrompt") && !root.get("imagePrompt").isJsonNull())
+                project.imagePrompt = validateImagePrompt(root.get("imagePrompt").getAsString());
             if (root.has("animateImages")) project.animateImages = root.get("animateImages").getAsBoolean();
             if (root.has("visualEffectStrength")) project.visualEffectStrength = root.get("visualEffectStrength").getAsDouble();
             validateVisualEffectStrength(project.visualEffectStrength);

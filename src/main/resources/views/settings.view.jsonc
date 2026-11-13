@@ -50,6 +50,18 @@
       "type": "boolean",
       "initial": false
     },
+    "showImages": {
+      "type": "boolean",
+      "initial": false
+    },
+    "projectImagePrompt": {
+      "type": "string",
+      "initial": ""
+    },
+    "defaultImagePrompt": {
+      "type": "string",
+      "initial": ""
+    },
     "soundEffectPercent": {
       "type": "string",
       "initial": "100"
@@ -176,6 +188,17 @@
                 },
                 "events": {
                   "onClick": "showPrompt"
+                }
+              },
+              {
+                "type": "Button",
+                "id": "settingsNavImages",
+                "props": {
+                  "text": "Imagens do projeto",
+                  "height": 40
+                },
+                "events": {
+                  "onClick": "showImages"
                 }
               }
             ]
@@ -622,6 +645,81 @@
                         },
                         "events": {
                           "onClick": "resetPrompt"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "id": "settingsImagesPanel",
+                    "props": {
+                      "spacing": 12,
+                      "fillWidth": true
+                    },
+                    "bind": {
+                      "visible": "showImages"
+                    },
+                    "children": [
+                      {
+                        "type": "Text",
+                        "style": {
+                          "fontSize": 20
+                        },
+                        "props": {
+                          "text": "Imagens do projeto"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Prompt de geração de imagens válido somente para o projeto aberto. Ele substitui as instruções padrão abaixo; o contexto do roteiro e o texto de cada cena continuam sendo acrescentados automaticamente. Deixe vazio para usar o padrão.",
+                          "wrapWidth": 520
+                        }
+                      },
+                      {
+                        "type": "TextArea",
+                        "id": "projectImagePromptInput",
+                        "props": {
+                          "height": 260,
+                          "width": 530,
+                          "placeholder": "Estilo, paleta, elementos permitidos e proibidos para as imagens deste projeto"
+                        },
+                        "bind": {
+                          "value": "projectImagePrompt"
+                        }
+                      },
+                      {
+                        "type": "Button",
+                        "id": "clearImagePromptButton",
+                        "props": {
+                          "text": "Usar prompt padrão",
+                          "height": 36
+                        },
+                        "events": {
+                          "onClick": "clearImagePrompt"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "Prompt padrão do editor:"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "id": "defaultImagePromptText",
+                        "props": {
+                          "wrapWidth": 520
+                        },
+                        "bind": {
+                          "text": "defaultImagePrompt"
+                        }
+                      },
+                      {
+                        "type": "Text",
+                        "props": {
+                          "text": "O prompt é salvo no arquivo do projeto. Imagens já anexadas não são refeitas; um prompt diferente não reaproveita imagens da biblioteca geradas com outras instruções.",
+                          "wrapWidth": 520
                         }
                       }
                     ]

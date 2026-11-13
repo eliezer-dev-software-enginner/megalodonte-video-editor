@@ -53,7 +53,7 @@ class EditorViewTest {
                 var promptField=(TextArea)settingsRoot.lookup(".text-area");
                 assertEquals(EditorSettings.DEFAULT_SOUNDS,folderField.getText());
                 assertTrue(promptField.getText().contains("PRODUTOR DO PROJETO"));assertTrue(promptField.getText().contains("PLANO SONORO POR CENA"));
-                for(String section:new String[]{"Efeitos visuais","Ferramentas","Avatar","Prompt base","Geral"}) {
+                for(String section:new String[]{"Efeitos visuais","Ferramentas","Avatar","Prompt base","Imagens do projeto","Geral"}) {
                     var navigation=settingsRoot.lookupAll(".button").stream()
                         .filter(n->n instanceof Button b && b.getText().equals(section)).map(n->(Button)n).findFirst().orElseThrow();
                     navigation.fire();
@@ -73,6 +73,11 @@ class EditorViewTest {
                 var imagesFolder=Files.createTempDirectory("editor-images-");imagesField.setText(imagesFolder.toString());
                 effectCoverage.setValue("50% de efeitos sonoros");
                 keyField.setText("dummy-settings-key");promptField.setText("Prompt editado e salvo");
+                var imagePromptField=settingsRoot.lookupAll(".text-area").stream().filter(n->n instanceof TextArea area && area.getPromptText().startsWith("Estilo, paleta")).map(n->(TextArea)n).findFirst().orElseThrow();
+                assertEquals("",imagePromptField.getText());
+                assertTrue(settingsRoot.lookupAll("*").stream().anyMatch(n->(n instanceof javafx.scene.control.Labeled l && ImageGenerationJob.DEFAULT_PROMPT.equals(l.getText()))
+                        || (n instanceof javafx.scene.text.Text t && ImageGenerationJob.DEFAULT_PROMPT.equals(t.getText()))),"O prompt padrão aparece na seção Imagens do projeto");
+                imagePromptField.setText("Prompt de imagens deste projeto");
                 folderField.setText("/diretorio-inexistente-para-teste");
                 var saveSettings=settingsRoot.lookupAll(".button").stream().filter(n->n instanceof Button b && b.getText().equals("Salvar configurações")).map(n->(Button)n).findFirst().orElseThrow();
                 saveSettings.fire();assertTrue(settingsStage.isShowing());assertFalse(new EditorSettings().exists());
@@ -92,6 +97,7 @@ class EditorViewTest {
                 reopened.getScene().getRoot().applyCss();
                 assertTrue(reopened.getScene().getRoot().lookupAll(".text-field").stream().anyMatch(n->n instanceof TextField field && "Pasta compartilhada de imagens geradas".equals(field.getPromptText()) && imagesFolder.toString().equals(field.getText())));
                 assertTrue(reopened.getScene().getRoot().lookupAll(".combo-box").stream().anyMatch(n->n instanceof ComboBox<?> box && box.getItems().containsAll(java.util.List.of("pt","en")) && "en".equals(box.getValue())));
+                assertTrue(reopened.getScene().getRoot().lookupAll(".text-area").stream().anyMatch(n->n instanceof TextArea area && area.getPromptText().startsWith("Estilo, paleta") && "Prompt de imagens deste projeto".equals(area.getText())));
                 ((TextArea)reopened.getScene().getRoot().lookup(".text-area")).setText("Não salvar");reopened.close();
                 assertEquals("Prompt editado e salvo",new EditorSettings().load().basePrompt);
                 Files.delete(Path.of(System.getProperty("megalodonte.editor.settingsDir"),"editor-settings.json"));session.states().set("openaiKey","");
